@@ -53,7 +53,7 @@ export default function App() {
             )}
 
             {/* Assistant-only */}
-            {token && role === 'assistant' && (
+{token && (role === 'assistant' || role === 'admin') && (
               <>
                 <Route path="/students" element={<StudentManagement />} />
                 <Route

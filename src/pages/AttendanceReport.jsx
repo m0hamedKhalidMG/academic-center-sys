@@ -41,7 +41,7 @@ import {
   scanAttendance,
   getDailyGroupAttendance,
   getGroupAttendanceReport,
-  getAllStudents,
+  getAllGroups, // Changed from getAllStudents
   sendAttendanceNotification,
 } from '../services/endpoints';
 import { format } from 'date-fns';
@@ -112,29 +112,47 @@ export default function AttendanceReport() {
   const timeoutsRef = useRef([]);
 
   // Scan handler
-  const handleScan = async (e) => {
-    e.preventDefault();
-    if (scanLockRef.current) return;
-    scanLockRef.current = true;
-    setScanError('');
-    setScanSuccess('');
-    if (!cardCode.trim()) {
-      setScanError('Please enter or scan a card code.');
-      scanLockRef.current = false;
-      return;
-    }
-    const code = cardCode.trim();
-    setCardCode('');
-    setScanLoading(true);
-    if (recentlyScanned.includes(code)) {
-      setScanError('This card was already scanned recently.');
-      timeoutsRef.current.push(setTimeout(() => inputRef.current?.focus(), 50));
-      setScanLoading(false);
-      scanLockRef.current = false;
-      return;
-    }
-    try {
-      const res = await scanAttendance({ cardCode: code });
+ // Update the handleScan function to handle suspended students
+const handleScan = async (e) => {
+  e.preventDefault();
+  if (scanLockRef.current) return;
+  scanLockRef.current = true;
+  setScanError('');
+  setScanSuccess('');
+  if (!cardCode.trim()) {
+    setScanError('Please enter or scan a card code.');
+    scanLockRef.current = false;
+    return;
+  }
+  const code = cardCode.trim();
+  setCardCode('');
+  setScanLoading(true);
+  if (recentlyScanned.includes(code)) {
+    setScanError('This card was already scanned recently.');
+    timeoutsRef.current.push(setTimeout(() => inputRef.current?.focus(), 50));
+    setScanLoading(false);
+    scanLockRef.current = false;
+    return;
+  }
+  try {
+    const res = await scanAttendance({ cardCode: code });
+    
+    // Check if student is suspended
+    if (res.data && res.data.success === false && res.data.data.message === "Student is suspended") {
+      const student = res.data.data.student;
+      const suspension = res.data.data.suspension;
+      
+      // Format suspension details
+      const suspensionType = suspension.type === 'permanent' ? 'Permanently' : 'Temporarily';
+      const endDate = suspension.endDate 
+        ? ` until ${format(new Date(suspension.endDate), 'MMM dd, yyyy')}`
+        : '';
+      
+      setScanError(
+        `Student ${student.fullName} is ${suspensionType.toLowerCase()} suspended${endDate}.`
+      );
+    } else if (res.data?.success) {
+      // Normal successful scan
       const name = res.data?.data?.student?.fullName || 'Unknown Student';
       setScanSuccess(`Marked attendance for: ${name}`);
       setRecentlyScanned((prev) => [...prev, code]);
@@ -145,34 +163,38 @@ export default function AttendanceReport() {
           5000
         )
       );
-    } catch (err) {
-      setScanError(err.response?.data?.message || 'Scan failed');
-    } finally {
-      setScanLoading(false);
-      timeoutsRef.current.push(
-        setTimeout(() => (scanLockRef.current = false), 200)
-      );
+    } else {
+      // Other error cases
+      setScanError(res.data?.data?.message || 'Scan failed');
     }
-  };
+  } catch (err) {
+    // Handle network errors or other exceptions
+    setScanError(err.response?.data?.message || 'Scan failed');
+  } finally {
+    setScanLoading(false);
+    timeoutsRef.current.push(
+      setTimeout(() => (scanLockRef.current = false), 200)
+    );
+  }
+};
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && cardCode) handleScan(e);
   };
 
-  // Fetch groups
+  // Fetch groups - UPDATED to use getAllGroups
   const fetchGroups = async () => {
     setLoadingGroups(true);
     setErrorGroups('');
     try {
-      const res = await getAllStudents();
-      const groups = Array.from(
-        new Set(res.data.data.map((s) => s.groupCode).filter(Boolean))
-      );
+      const res = await getAllGroups();
+      // Assuming the API returns an array of group objects with code property
+      const groups = res.data.data.map(group => group.code).filter(Boolean);
       setGroupOptions(groups);
       if (groups.length === 1) {
         setFilters((f) => ({ ...f, groupCode: groups[0] }));
       }
     } catch (err) {
-      console.error(err);
+      console.error('Error fetching groups:', err);
       setErrorGroups(err.response?.data?.message || 'Failed to load groups.');
     } finally {
       setLoadingGroups(false);
@@ -181,6 +203,8 @@ export default function AttendanceReport() {
 
   // Fetch daily
   const fetchDaily = async () => {
+    if (!filters.groupCode) return;
+    
     setLoadingDaily(true);
     setErrorDaily('');
     try {
@@ -202,6 +226,8 @@ export default function AttendanceReport() {
 
   // Fetch monthly
   const fetchMonthly = async () => {
+    if (!filters.groupCode) return;
+    
     setLoadingMonthly(true);
     setErrorMonthly('');
     try {
@@ -278,12 +304,9 @@ export default function AttendanceReport() {
     console.log('Monthly notify payload:', payload);
     setNotifyStatus({ loading: true, error: '', success: '' });
     try {
-
-     await sendAttendanceNotification({ students: [payload] });
-
+      await sendAttendanceNotification({ students: [payload] });
       setNotifyStatus({ loading: false, success: 'Notification sent!' });
     } catch (err) {
-      console.log(err)
       console.error(err);
       setNotifyStatus({
         loading: false,

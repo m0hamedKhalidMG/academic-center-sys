@@ -32,12 +32,32 @@ import {
   Button,
   IconButton,
   Stack,
+  Chip,
+  CardHeader,
+  Divider,
+  InputAdornment,
+  Tooltip,
+  useTheme,
+  useMediaQuery,
+  alpha,
+  LinearProgress,
 } from '@mui/material';
-import { motion } from 'framer-motion';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import AddIcon from '@mui/icons-material/Add';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Refresh as RefreshIcon,
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  People as PeopleIcon,
+  Schedule as ScheduleIcon,
+  Group as GroupIcon,
+  QrCode as QrCodeIcon,
+  Search as SearchIcon,
+  Visibility as VisibilityIcon,
+  Security as SecurityIcon,
+  School as SchoolIcon,
+  Today as TodayIcon,
+} from '@mui/icons-material';
 
 import {
   getAllAssistants,
@@ -50,10 +70,56 @@ import {
   deleteGroup,
 } from '../services/endpoints';
 
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.5,
+      ease: "easeOut"
+    }
+  }
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, scale: 0.95 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: {
+      duration: 0.4
+    }
+  }
+};
+
+// Professional color scheme
+const professionalColors = {
+  primary: '#2563eb',
+  secondary: '#7c3aed',
+  success: '#059669',
+  warning: '#d97706',
+  error: '#dc2626',
+  info: '#0891b2'
+};
+
 export default function AdminDashboard() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [tabIndex, setTabIndex] = useState(0);
 
-  // --- Assistants ---
+  // --- State variables (same as before) ---
   const [assistants, setAssistants] = useState([]);
   const [loadingAssistants, setLoadingAssistants] = useState(true);
   const [errorAssistants, setErrorAssistants] = useState('');
@@ -72,7 +138,6 @@ export default function AdminDashboard() {
     newPassword: '',
   });
 
-  // --- Attendance ---
   const [filters, setFilters] = useState({
     date: new Date().toISOString().slice(0, 10),
     groupCode: '',
@@ -81,7 +146,6 @@ export default function AdminDashboard() {
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [errorAttendance, setErrorAttendance] = useState('');
 
-  // --- Groups ---
   const [groups, setGroups] = useState([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
   const [errorGroups, setErrorGroups] = useState('');
@@ -103,9 +167,8 @@ export default function AdminDashboard() {
     error: '',
   });
 
-  // --- Effects ---
+  // --- Effects (same as before) ---
   useEffect(() => {
-    // load assistants
     (async () => {
       try {
         const res = await getAllAssistants();
@@ -116,7 +179,6 @@ export default function AdminDashboard() {
         setLoadingAssistants(false);
       }
     })();
-    // load groups
     fetchGroups();
   }, []);
 
@@ -130,25 +192,23 @@ export default function AdminDashboard() {
     (async () => {
       try {
         const res = await getAttendanceByDateGroup(filters);
-        // ensure it's always an array
         const arr = Array.isArray(res.data.data) ? res.data.data : [];
         setAttendance(arr);
       } catch (err) {
         setErrorAttendance(
           err.response?.data?.message || 'Failed to load attendance.'
         );
-        setAttendance([]); // fallback to empty
+        setAttendance([]);
       } finally {
         setLoadingAttendance(false);
       }
     })();
   }, [filters]);
 
-  // --- Helpers ---
+  // --- Helper functions (same as before) ---
   const handleFilterChange = (e) =>
     setFilters((f) => ({ ...f, [e.target.name]: e.target.value }));
 
-  // --- Assistants: create ---
   const submitCreate = async (e) => {
     e.preventDefault();
     setCreateError('');
@@ -162,9 +222,9 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- Assistants: reset ---
   const openReset = (id) =>
     setResetDialog({ open: true, id, cardId: '', error: '', newPassword: '' });
+  
   const submitReset = async () => {
     setResetDialog((d) => ({ ...d, error: '', newPassword: '' }));
     try {
@@ -180,7 +240,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- Groups API ---
   async function fetchGroups() {
     setLoadingGroups(true);
     setErrorGroups('');
@@ -194,7 +253,6 @@ export default function AdminDashboard() {
     }
   }
 
-  // --- Groups: dialog handlers ---
   const openCreateGroup = () =>
     setGroupDialog({
       mode: 'create',
@@ -207,6 +265,7 @@ export default function AdminDashboard() {
       },
       error: '',
     });
+  
   const openEditGroup = (group) =>
     setGroupDialog({
       mode: 'edit',
@@ -222,14 +281,15 @@ export default function AdminDashboard() {
       },
       error: '',
     });
+  
   const closeGroupDialog = () => setGroupDialog((d) => ({ ...d, open: false }));
 
   const openDeleteGroup = (id, code) =>
     setDeleteDialog({ open: true, id, code, error: '' });
+  
   const closeDeleteDialog = () =>
     setDeleteDialog((d) => ({ ...d, open: false }));
 
-  // --- Groups: create/update ---
   const handleGroupField = (field, value) =>
     setGroupDialog((d) => ({ ...d, data: { ...d.data, [field]: value } }));
 
@@ -240,6 +300,7 @@ export default function AdminDashboard() {
       return { ...d, data: { ...d.data, schedule: sched } };
     });
   };
+  
   const addScheduleRow = () =>
     setGroupDialog((d) => ({
       ...d,
@@ -248,6 +309,7 @@ export default function AdminDashboard() {
         schedule: [...d.data.schedule, { day: '', startTime: '', endTime: '' }],
       },
     }));
+  
   const removeScheduleRow = (idx) =>
     setGroupDialog((d) => ({
       ...d,
@@ -286,7 +348,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- Groups: delete ---
   const submitDeleteGroup = async () => {
     setDeleteDialog((d) => ({ ...d, error: '' }));
     try {
@@ -301,437 +362,1070 @@ export default function AdminDashboard() {
     }
   };
 
+  // Enhanced status chip colors
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'present': return 'success';
+      case 'absent': return 'error';
+      case 'late': return 'warning';
+      default: return 'default';
+    }
+  };
+
+  // Calculate statistics
+  const totalStudents = groups.reduce((sum, group) => sum + group.maxStudents, 0);
+  const todayAttendance = attendance.filter(a => a.status === 'present').length;
+
   return (
-    <Container sx={{ mt: 4 }}>
-      <Typography variant="h4" gutterBottom>
-        Admin Dashboard
-      </Typography>
-
-      <Tabs
-        value={tabIndex}
-        onChange={(_, v) => setTabIndex(v)}
-        textColor="primary"
-        indicatorColor="primary"
-        sx={{ mb: 3 }}
+    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      {/* Enhanced Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
       >
-        <Tab label="Overview" />
-        <Tab label="Manage Assistants" />
-        <Tab label="Manage Groups" />
-      </Tabs>
+        <Box sx={{ mb: 4 }}>
+          <Typography 
+            variant="h4" 
+            gutterBottom 
+            fontWeight="bold"
+            sx={{
+              background: `linear-gradient(135deg, ${professionalColors.primary}, ${professionalColors.secondary})`,
+              backgroundClip: 'text',
+              WebkitBackgroundClip: 'text',
+              color: 'transparent',
+              display: 'inline-block'
+            }}
+          >
+            Admin Dashboard
+          </Typography>
+          <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 2 }}>
+            Comprehensive management system for assistants, groups, and attendance monitoring
+          </Typography>
+          <Divider sx={{ mb: 3 }} />
+        </Box>
+      </motion.div>
 
-      {tabIndex === 0 && (
-        <Box>
-          {/* Overview Filters */}
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} sm={6} md={3}>
-              <TextField
-                type="date"
-                name="date"
-                label="Date"
-                fullWidth
-                value={filters.date}
-                onChange={handleFilterChange}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={3}>
-              {errorGroups && <Alert severity="error">{errorGroups}</Alert>}
-              <TextField
-                select
-                name="groupCode"
-                label="Group"
-                fullWidth
-                value={filters.groupCode}
-                onChange={handleFilterChange}
-                disabled={loadingGroups}
-              >
-                <MenuItem value="">Select Group</MenuItem>
-                {groups.map((g) => (
-                  <MenuItem key={g._id} value={g.code}>
-                    {g.code}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Grid>
-          </Grid>
+      {/* Enhanced Navigation Tabs */}
+      <Paper 
+        sx={{ 
+          mb: 4, 
+          borderRadius: 3,
+          background: `linear-gradient(135deg, ${alpha(professionalColors.primary, 0.05)}, ${alpha(professionalColors.secondary, 0.05)})`,
+          border: `1px solid ${alpha(professionalColors.primary, 0.1)}`,
+          overflow: 'hidden'
+        }}
+      >
+        <Tabs
+          value={tabIndex}
+          onChange={(_, v) => setTabIndex(v)}
+          textColor="primary"
+          indicatorColor="primary"
+          variant={isMobile ? "scrollable" : "standard"}
+          scrollButtons="auto"
+          sx={{
+            '& .MuiTab-root': {
+              minHeight: 64,
+              fontWeight: 600,
+              fontSize: '0.95rem',
+              '&.Mui-selected': {
+                color: professionalColors.primary,
+              }
+            },
+            '& .MuiTabs-indicator': {
+              backgroundColor: professionalColors.primary,
+              height: 3,
+              borderRadius: 3
+            }
+          }}
+        >
+          <Tab 
+            icon={<VisibilityIcon />} 
+            label="Dashboard Overview" 
+            iconPosition="start"
+          />
+          <Tab 
+            icon={<PeopleIcon />} 
+            label="Assistant Management" 
+            iconPosition="start"
+          />
+          <Tab 
+            icon={<GroupIcon />} 
+            label="Group Management" 
+            iconPosition="start"
+          />
+        </Tabs>
+      </Paper>
 
-          {/* Overview Summary */}
-          <Grid container spacing={3} sx={{ mb: 4 }}>
-            {[
-              { label: 'Assistants', value: assistants.length },
-              {
-                label: 'Attendance',
-                value: filters.groupCode ? attendance.length : 0,
-              },
-            ].map((c, i) => (
-              <Grid key={c.label} item xs={12} sm={6} md={3}>
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.1 }}
-                >
-                  <Card>
-                    <CardContent>
-                      <Typography color="textSecondary">{c.label}</Typography>
-                      <Typography variant="h3">{c.value}</Typography>
+      <AnimatePresence mode="wait">
+        {tabIndex === 0 && (
+          <motion.div
+            key="overview"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            {/* Enhanced Statistics Cards */}
+            <Grid container spacing={3} sx={{ mb: 4 }}>
+              {[
+                { 
+                  label: 'Total Assistants', 
+                  value: assistants.length, 
+                  icon: PeopleIcon,
+                  color: 'primary',
+                  description: 'Registered teaching assistants'
+                },
+                { 
+                  label: 'Active Groups', 
+                  value: groups.length, 
+                  icon: GroupIcon,
+                  color: 'secondary',
+                  description: 'Managed student groups'
+                },
+               
+              ].map((stat, i) => (
+                <Grid key={stat.label} item xs={12} sm={6} lg={3}>
+                  <motion.div variants={cardVariants}>
+                    <Card 
+                      sx={{ 
+                        height: '100%',
+                        background: `linear-gradient(135deg, ${alpha(theme.palette[stat.color].main, 0.1)}, ${alpha(theme.palette[stat.color].main, 0.05)})`,
+                        border: `1px solid ${alpha(theme.palette[stat.color].main, 0.2)}`,
+                        borderRadius: 3,
+                        boxShadow: '0 4px 20px 0 rgba(0,0,0,0.05)',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: 'translateY(-4px)',
+                          boxShadow: '0 8px 30px 0 rgba(0,0,0,0.1)',
+                        }
+                      }}
+                    >
+                      <CardContent sx={{ p: 3 }}>
+                        <Box display="flex" alignItems="center" justifyContent="space-between">
+                          <Box flex={1}>
+                            <Typography 
+                              color="textSecondary" 
+                              variant="body2"
+                              fontWeight={600}
+                              sx={{ mb: 0.5 }}
+                            >
+                              {stat.label}
+                            </Typography>
+                            <Typography 
+                              variant="h3" 
+                              fontWeight="bold"
+                              sx={{ 
+                                color: theme.palette[stat.color].main,
+                                mb: 1
+                              }}
+                            >
+                              {stat.value}
+                            </Typography>
+                            <Typography 
+                              variant="caption" 
+                              color="text.secondary"
+                              sx={{ opacity: 0.8 }}
+                            >
+                              {stat.description}
+                            </Typography>
+                          </Box>
+                          <Box
+                            sx={{
+                              p: 2,
+                              borderRadius: 3,
+                              backgroundColor: alpha(theme.palette[stat.color].main, 0.1),
+                              ml: 2
+                            }}
+                          >
+                            <stat.icon 
+                              sx={{ 
+                                fontSize: 32,
+                                color: theme.palette[stat.color].main 
+                              }} 
+                            />
+                          </Box>
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                </Grid>
+              ))}
+            </Grid>
+
+            <Grid container spacing={3}>
+              {/* Enhanced Assistants List */}
+              <Grid item xs={12} lg={6}>
+                <motion.div variants={itemVariants}>
+                  <Card 
+                    sx={{ 
+                      borderRadius: 3,
+                      boxShadow: '0 4px 20px 0 rgba(0,0,0,0.05)',
+                      height: '100%'
+                    }}
+                  >
+                    <CardHeader
+                      title="Recent Assistants"
+                      titleTypographyProps={{ variant: 'h6', fontWeight: 600 }}
+                      action={
+                        <Tooltip title="Refresh assistants">
+                          <IconButton 
+                            onClick={() => window.location.reload()}
+                            sx={{
+                              backgroundColor: alpha(professionalColors.primary, 0.1),
+                              '&:hover': {
+                                backgroundColor: alpha(professionalColors.primary, 0.2),
+                              }
+                            }}
+                          >
+                            <RefreshIcon />
+                          </IconButton>
+                        </Tooltip>
+                      }
+                    />
+                    <Divider />
+                    <CardContent sx={{ p: 0 }}>
+                      {loadingAssistants ? (
+                        <Box display="flex" justifyContent="center" p={3}>
+                          <CircularProgress />
+                        </Box>
+                      ) : errorAssistants ? (
+                        <Alert 
+                          severity="error" 
+                          sx={{ m: 2 }}
+                          action={
+                            <Button color="inherit" size="small" onClick={() => window.location.reload()}>
+                              RETRY
+                            </Button>
+                          }
+                        >
+                          {errorAssistants}
+                        </Alert>
+                      ) : (
+                        <List disablePadding>
+                          {assistants.slice(0, 5).map((a, index) => (
+                            <ListItem 
+                              key={a._id} 
+                              divider={index < Math.min(assistants.length - 1, 4)}
+                              sx={{ 
+                                px: 3, 
+                                py: 2.5,
+                                transition: 'background-color 0.2s ease',
+                                '&:hover': {
+                                  backgroundColor: alpha(professionalColors.primary, 0.04),
+                                }
+                              }}
+                            >
+                              <ListItemAvatar>
+                                <Avatar 
+                                  sx={{ 
+                                    bgcolor: professionalColors.primary,
+                                    fontWeight: 600
+                                  }}
+                                >
+                                  {a.name[0].toUpperCase()}
+                                </Avatar>
+                              </ListItemAvatar>
+                              <ListItemText 
+                                primary={
+                                  <Typography fontWeight={600} variant="body1">
+                                    {a.name}
+                                  </Typography>
+                                } 
+                                secondary={
+                                  <Typography variant="body2" color="text.secondary">
+                                    {a.email}
+                                  </Typography>
+                                }
+                              />
+                              <Chip 
+                                label="Active" 
+                                size="small" 
+                                color="success" 
+                                variant="outlined"
+                                sx={{ 
+                                  fontWeight: 600,
+                                  borderWidth: 2
+                                }}
+                              />
+                            </ListItem>
+                          ))}
+                        </List>
+                      )}
                     </CardContent>
                   </Card>
                 </motion.div>
               </Grid>
-            ))}
-          </Grid>
 
-          {/* Overview Assistants */}
-          <Typography variant="h6" gutterBottom>
-            Assistants
-          </Typography>
-          {loadingAssistants ? (
-            <CircularProgress />
-          ) : errorAssistants ? (
-            <Alert severity="error">{errorAssistants}</Alert>
-          ) : (
-            <Paper sx={{ maxHeight: 240, overflow: 'auto', mb: 4 }}>
-              <List disablePadding>
-                {assistants.map((a) => (
-                  <ListItem key={a._id} divider>
-                    <ListItemAvatar>
-                      <Avatar>{a.name[0]}</Avatar>
-                    </ListItemAvatar>
-                    <ListItemText primary={a.name} secondary={a.email} />
-                  </ListItem>
-                ))}
-              </List>
-            </Paper>
-          )}
+             
+            </Grid>
+          </motion.div>
+        )}
 
-          {/* Overview Attendance */}
-          <Typography variant="h6" gutterBottom>
-            Attendance
-          </Typography>
-          {!filters.groupCode ? (
-            <Alert severity="info">
-              Please select a group to view attendance.
-            </Alert>
-          ) : loadingAttendance ? (
-            <CircularProgress />
-          ) : errorAttendance ? (
-            <Alert severity="error">{errorAttendance}</Alert>
-          ) : attendance.length === 0 ? (
-            <Alert severity="info">
-              No attendance recorded for {filters.date}.
-            </Alert>
-          ) : (
-            <Paper>
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Student</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell>Scanned At</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {attendance.map((rec) => (
-                      <TableRow key={rec._id}>
-                        <TableCell>{rec.student.fullName}</TableCell>
-                        <TableCell sx={{ textTransform: 'capitalize' }}>
-                          {rec.status}
-                        </TableCell>
-                        <TableCell>
-                          {new Date(rec.scannedAt).toLocaleTimeString()}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Paper>
-          )}
-        </Box>
-      )}
-
-      {tabIndex === 1 && (
-        <Box>
-          {/* Create Assistant */}
-          <Typography variant="h6" gutterBottom>
-            Create New Assistant
-          </Typography>
-          <Box
-            component="form"
-            onSubmit={submitCreate}
-            sx={{
-              mb: 2,
-              display: 'grid',
-              gap: 2,
-              gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))',
-            }}
+        {tabIndex === 1 && (
+          <motion.div
+            key="assistants"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
           >
-            {['name', 'email', 'password', 'cardId'].map((f) => (
-              <TextField
-                key={f}
-                name={f}
-                label={f.charAt(0).toUpperCase() + f.slice(1)}
-                type={f === 'password' ? 'password' : 'text'}
-                value={newAsst[f]}
-                onChange={(e) =>
-                  setNewAsst((s) => ({ ...s, [f]: e.target.value }))
-                }
-                required
-              />
-            ))}
-            <Button type="submit" variant="contained">
-              Create
-            </Button>
-          </Box>
-          {createError && <Alert severity="error">{createError}</Alert>}
+            <Grid container spacing={3}>
+              {/* Enhanced Create Assistant Card */}
+              <Grid item xs={12} lg={4}>
+                <motion.div variants={cardVariants}>
+                  <Card 
+                    sx={{ 
+                      borderRadius: 3,
+                      boxShadow: '0 4px 20px 0 rgba(0,0,0,0.05)',
+                      height: 'fit-content'
+                    }}
+                  >
+                    <CardHeader
+                      title="Create Assistant"
+                      titleTypographyProps={{ variant: 'h6', fontWeight: 600 }}
+                      avatar={
+                        <Avatar sx={{ bgcolor: professionalColors.primary }}>
+                          <AddIcon />
+                        </Avatar>
+                      }
+                    />
+                    <Divider />
+                    <CardContent sx={{ pt: 3 }}>
+                      <Box component="form" onSubmit={submitCreate} sx={{ display: 'grid', gap: 2.5 }}>
+                        {[
+                          { field: 'name', label: 'Full Name', type: 'text' },
+                          { field: 'email', label: 'Email Address', type: 'email' },
+                          { field: 'password', label: 'Password', type: 'password' },
+                          { field: 'cardId', label: 'Card ID', type: 'text' },
+                        ].map(({ field, label, type }) => (
+                          <TextField
+                            key={field}
+                            name={field}
+                            label={label}
+                            type={type}
+                            value={newAsst[field]}
+                            onChange={(e) =>
+                              setNewAsst((s) => ({ ...s, [field]: e.target.value }))
+                            }
+                            required
+                            fullWidth
+                            size="medium"
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: 2,
+                              }
+                            }}
+                          />
+                        ))}
+                        <Button 
+                          type="submit" 
+                          variant="contained" 
+                          fullWidth
+                          sx={{
+                            py: 1.5,
+                            borderRadius: 2,
+                            background: `linear-gradient(135deg, ${professionalColors.primary}, ${professionalColors.secondary})`,
+                            fontWeight: 600,
+                            textTransform: 'none',
+                            fontSize: '1rem',
+                            mt: 1
+                          }}
+                        >
+                          Create Assistant
+                        </Button>
+                      </Box>
+                      {createError && (
+                        <Alert 
+                          severity="error" 
+                          sx={{ 
+                            mt: 2,
+                            borderRadius: 2
+                          }}
+                        >
+                          {createError}
+                        </Alert>
+                      )}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </Grid>
 
-          {/* Reset Password */}
-          <Typography variant="h6" gutterBottom sx={{ mt: 4 }}>
-            Reset Assistant Password
-          </Typography>
-          <Paper sx={{ p: 2 }}>
-            <List disablePadding>
-              {assistants.map((a) => (
-                <ListItem
-                  key={a._id}
-                  secondaryAction={
-                    <IconButton edge="end" onClick={() => openReset(a._id)}>
+              {/* Enhanced Assistants List Card */}
+              <Grid item xs={12} lg={8}>
+                <motion.div variants={cardVariants}>
+                  <Card 
+                    sx={{ 
+                      borderRadius: 3,
+                      boxShadow: '0 4px 20px 0 rgba(0,0,0,0.05)'
+                    }}
+                  >
+                    <CardHeader
+                      title="Assistant Management"
+                      subheader={`${assistants.length} assistant(s) registered`}
+                      titleTypographyProps={{ variant: 'h6', fontWeight: 600 }}
+                      action={
+                        <Tooltip title="Refresh list">
+                          <IconButton 
+                            onClick={() => window.location.reload()}
+                            sx={{
+                              backgroundColor: alpha(professionalColors.primary, 0.1),
+                              '&:hover': {
+                                backgroundColor: alpha(professionalColors.primary, 0.2),
+                              }
+                            }}
+                          >
+                            <RefreshIcon />
+                          </IconButton>
+                        </Tooltip>
+                      }
+                    />
+                    <Divider />
+                    <CardContent sx={{ p: 0 }}>
+                      {loadingAssistants ? (
+                        <Box display="flex" justifyContent="center" p={3}>
+                          <CircularProgress />
+                        </Box>
+                      ) : errorAssistants ? (
+                        <Alert 
+                          severity="error" 
+                          sx={{ m: 2 }}
+                          action={
+                            <Button color="inherit" size="small" onClick={() => window.location.reload()}>
+                              RETRY
+                            </Button>
+                          }
+                        >
+                          {errorAssistants}
+                        </Alert>
+                      ) : (
+                        <List disablePadding>
+                          {assistants.map((a, index) => (
+                            <ListItem 
+                              key={a._id} 
+                              divider={index < assistants.length - 1}
+                              secondaryAction={
+                                <Tooltip title="Reset Password & Card">
+                                  <IconButton 
+                                    edge="end" 
+                                    onClick={() => openReset(a._id)}
+                                    sx={{
+                                      color: professionalColors.primary,
+                                      backgroundColor: alpha(professionalColors.primary, 0.1),
+                                      '&:hover': {
+                                        backgroundColor: alpha(professionalColors.primary, 0.2),
+                                      }
+                                    }}
+                                  >
+                                    <SecurityIcon />
+                                  </IconButton>
+                                </Tooltip>
+                              }
+                              sx={{ 
+                                px: 3, 
+                                py: 2.5,
+                                transition: 'background-color 0.2s ease',
+                                '&:hover': {
+                                  backgroundColor: alpha(professionalColors.primary, 0.04),
+                                }
+                              }}
+                            >
+                              <ListItemAvatar>
+                                <Avatar 
+                                  sx={{ 
+                                    bgcolor: professionalColors.primary,
+                                    fontWeight: 600
+                                  }}
+                                >
+                                  {a.name[0].toUpperCase()}
+                                </Avatar>
+                              </ListItemAvatar>
+                              <ListItemText 
+                                primary={
+                                  <Typography fontWeight={600} variant="body1">
+                                    {a.name}
+                                  </Typography>
+                                } 
+                                secondary={
+                                  <Typography variant="body2" color="text.secondary">
+                                    {a.email}
+                                  </Typography>
+                                }
+                              />
+                              <Chip 
+                                label={a.cardId || 'No Card'} 
+                                size="small" 
+                                variant="outlined"
+                                sx={{ 
+                                  mr: 2,
+                                  fontWeight: 600,
+                                  borderWidth: 2
+                                }}
+                              />
+                            </ListItem>
+                          ))}
+                        </List>
+                      )}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </Grid>
+            </Grid>
+
+            {/* Enhanced Reset Password Dialog */}
+            <Dialog
+              open={resetDialog.open}
+              onClose={() => setResetDialog((d) => ({ ...d, open: false }))}
+              maxWidth="sm"
+              fullWidth
+              PaperProps={{
+                sx: {
+                  borderRadius: 3,
+                  boxShadow: '0 20px 60px 0 rgba(0,0,0,0.15)'
+                }
+              }}
+            >
+              <DialogTitle sx={{ 
+                fontWeight: 600,
+                background: `linear-gradient(135deg, ${alpha(professionalColors.primary, 0.05)}, ${alpha(professionalColors.secondary, 0.05)})`
+              }}>
+                Reset Assistant Credentials
+              </DialogTitle>
+              <DialogContent>
+                <Stack spacing={3} sx={{ mt: 2 }}>
+                  <TextField
+                    label="New Card ID"
+                    value={resetDialog.cardId}
+                    onChange={(e) =>
+                      setResetDialog((d) => ({ ...d, cardId: e.target.value }))
+                    }
+                    fullWidth
+                    required
+                    helperText="Enter the new card ID for this assistant"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                      }
+                    }}
+                  />
+                  {resetDialog.error && (
+                    <Alert 
+                      severity="error" 
+                      sx={{ borderRadius: 2 }}
+                    >
+                      {resetDialog.error}
+                    </Alert>
+                  )}
+                  {resetDialog.newPassword && (
+                    <Alert 
+                      severity="success" 
+                      sx={{ borderRadius: 2 }}
+                    >
+                      <Typography variant="subtitle2" gutterBottom fontWeight={600}>
+                        ✅ Password Reset Successful
+                      </Typography>
+                      <Typography variant="body1" sx={{ mt: 1, mb: 1 }}>
+                        New Password: <strong>{resetDialog.newPassword}</strong>
+                      </Typography>
+                      <Typography variant="body2">
+                        Please provide this password to the assistant and instruct them to change it immediately.
+                      </Typography>
+                    </Alert>
+                  )}
+                </Stack>
+              </DialogContent>
+              <DialogActions sx={{ p: 3, pt: 0 }}>
+                <Button 
+                  onClick={() => setResetDialog((d) => ({ ...d, open: false }))}
+                  sx={{ 
+                    borderRadius: 2,
+                    fontWeight: 600,
+                    px: 3
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={submitReset} 
+                  variant="contained"
+                  disabled={!resetDialog.cardId}
+                  sx={{ 
+                    borderRadius: 2,
+                    fontWeight: 600,
+                    px: 3,
+                    background: `linear-gradient(135deg, ${professionalColors.primary}, ${professionalColors.secondary})`,
+                  }}
+                >
+                  Reset Credentials
+                </Button>
+              </DialogActions>
+            </Dialog>
+          </motion.div>
+        )}
+
+        {tabIndex === 2 && (
+          <motion.div
+            key="groups"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            {/* Enhanced Groups Management Header */}
+            <Card 
+              sx={{ 
+                mb: 3,
+                borderRadius: 3,
+                background: `linear-gradient(135deg, ${alpha(professionalColors.primary, 0.03)}, ${alpha(professionalColors.secondary, 0.03)})`,
+                border: `1px solid ${alpha(professionalColors.primary, 0.1)}`
+              }}
+            >
+              <CardContent sx={{ p: 4 }}>
+                <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
+                  <Box>
+                    <Typography variant="h5" gutterBottom fontWeight="bold">
+                      Group Management
+                    </Typography>
+                    <Typography variant="body1" color="text.secondary">
+                      Create and manage student groups with customized schedules
+                    </Typography>
+                  </Box>
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={openCreateGroup}
+                    size={isMobile ? "medium" : "large"}
+                    sx={{
+                      borderRadius: 2,
+                      background: `linear-gradient(135deg, ${professionalColors.primary}, ${professionalColors.secondary})`,
+                      fontWeight: 600,
+                      textTransform: 'none',
+                      fontSize: '1rem',
+                      px: 4,
+                      py: 1
+                    }}
+                  >
+                    Create Group
+                  </Button>
+                </Box>
+              </CardContent>
+            </Card>
+
+            {/* Enhanced Groups Table */}
+            <Card 
+              sx={{ 
+                borderRadius: 3,
+                boxShadow: '0 4px 20px 0 rgba(0,0,0,0.05)'
+              }}
+            >
+              <CardHeader
+                title="All Groups"
+                titleTypographyProps={{ variant: 'h6', fontWeight: 600 }}
+                action={
+                  <Tooltip title="Refresh groups">
+                    <IconButton 
+                      onClick={fetchGroups}
+                      sx={{
+                        backgroundColor: alpha(professionalColors.primary, 0.1),
+                        '&:hover': {
+                          backgroundColor: alpha(professionalColors.primary, 0.2),
+                        }
+                      }}
+                    >
                       <RefreshIcon />
                     </IconButton>
-                  }
-                >
-                  <ListItemText primary={a.name} secondary={a.email} />
-                </ListItem>
-              ))}
-            </List>
-          </Paper>
-          <Dialog
-            open={resetDialog.open}
-            onClose={() => setResetDialog((d) => ({ ...d, open: false }))}
-          >
-            <DialogTitle>Reset Password</DialogTitle>
-            <DialogContent sx={{ display: 'grid', gap: 2, width: 300 }}>
-              <TextField
-                label="New Card ID"
-                value={resetDialog.cardId}
-                onChange={(e) =>
-                  setResetDialog((d) => ({ ...d, cardId: e.target.value }))
+                  </Tooltip>
                 }
-                required
               />
-              {resetDialog.error && (
-                <Alert severity="error">{resetDialog.error}</Alert>
-              )}
-              {resetDialog.newPassword && (
-                <Alert severity="success">
-                  New Password: <strong>{resetDialog.newPassword}</strong>
-                </Alert>
-              )}
-            </DialogContent>
-            <DialogActions>
-              <Button
-                onClick={() => setResetDialog((d) => ({ ...d, open: false }))}
-              >
-                Cancel
-              </Button>
-              <Button onClick={submitReset} variant="contained">
-                Reset
-              </Button>
-            </DialogActions>
-          </Dialog>
-        </Box>
-      )}
-
-      {tabIndex === 2 && (
-        <Box>
-          <Box
-            display="flex"
-            justifyContent="space-between"
-            alignItems="center"
-            mb={2}
-          >
-            <Typography variant="h6">Manage Groups</Typography>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={openCreateGroup}
-            >
-              Add Group
-            </Button>
-          </Box>
-
-          {loadingGroups ? (
-            <CircularProgress />
-          ) : errorGroups ? (
-            <Alert severity="error">{errorGroups}</Alert>
-          ) : (
-            <TableContainer component={Paper}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Code</TableCell>
-                    <TableCell>Level</TableCell>
-                    <TableCell>Max Students</TableCell>
-                    <TableCell>Schedule</TableCell>
-                    <TableCell align="right">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {groups.map((g) => (
-                    <TableRow key={g._id}>
-                      <TableCell>{g.code}</TableCell>
-                      <TableCell>{g.academicLevel}</TableCell>
-                      <TableCell>{g.maxStudents}</TableCell>
-                      <TableCell>
-                        {g.schedule
-                          .map((s) => `${s.day} ${s.startTime}-${s.endTime}`)
-                          .join(', ')}
-                      </TableCell>
-                      <TableCell align="right">
-                        <IconButton onClick={() => openEditGroup(g)}>
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton
-                          onClick={() => openDeleteGroup(g._id, g.code)}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-
-          {/* Create/Edit Group Dialog */}
-          <Dialog
-            open={groupDialog.open}
-            onClose={closeGroupDialog}
-            maxWidth="sm"
-            fullWidth
-          >
-            <DialogTitle>
-              {groupDialog.mode === 'create' ? 'Create Group' : 'Edit Group'}
-            </DialogTitle>
-            <DialogContent sx={{ display: 'grid', gap: 2 }}>
-              {groupDialog.error && (
-                <Alert severity="error">{groupDialog.error}</Alert>
-              )}
-              <TextField
-                label="Code"
-                value={groupDialog.data.code}
-                onChange={(e) => handleGroupField('code', e.target.value)}
-                fullWidth
-              />
-              <TextField
-                label="Academic Level"
-                value={groupDialog.data.academicLevel}
-                onChange={(e) =>
-                  handleGroupField('academicLevel', e.target.value)
-                }
-                fullWidth
-              />
-              <TextField
-                label="Max Students"
-                type="number"
-                value={groupDialog.data.maxStudents}
-                onChange={(e) =>
-                  handleGroupField('maxStudents', e.target.value)
-                }
-                fullWidth
-              />
-
-              <Typography>Schedule</Typography>
-              {groupDialog.data.schedule.map((row, idx) => (
-                <Stack
-                  key={idx}
-                  direction="row"
-                  spacing={1}
-                  alignItems="center"
-                >
-                  <TextField
-                    select
-                    label="Day"
-                    value={row.day}
-                    onChange={(e) =>
-                      handleScheduleChange(idx, 'day', e.target.value)
+              <Divider />
+              <CardContent sx={{ p: 0 }}>
+                {loadingGroups ? (
+                  <Box display="flex" justifyContent="center" p={3}>
+                    <CircularProgress />
+                  </Box>
+                ) : errorGroups ? (
+                  <Alert 
+                    severity="error" 
+                    sx={{ m: 2 }}
+                    action={
+                      <Button color="inherit" size="small" onClick={fetchGroups}>
+                        RETRY
+                      </Button>
                     }
-                    sx={{ flex: 1 }}
                   >
-                    {[
-                      'sunday',
-                      'monday',
-                      'tuesday',
-                      'wednesday',
-                      'thursday',
-                      'friday',
-                      'saturday',
-                    ].map((d) => (
-                      <MenuItem key={d} value={d}>
-                        {d.charAt(0).toUpperCase() + d.slice(1)}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                  <TextField
-                    label="Start"
-                    type="time"
-                    value={row.startTime}
-                    onChange={(e) =>
-                      handleScheduleChange(idx, 'startTime', e.target.value)
-                    }
-                    InputLabelProps={{ shrink: true }}
-                  />
-                  <TextField
-                    label="End"
-                    type="time"
-                    value={row.endTime}
-                    onChange={(e) =>
-                      handleScheduleChange(idx, 'endTime', e.target.value)
-                    }
-                    InputLabelProps={{ shrink: true }}
-                  />
-                  <IconButton onClick={() => removeScheduleRow(idx)}>
-                    <DeleteIcon />
-                  </IconButton>
-                </Stack>
-              ))}
-              <Button onClick={addScheduleRow}>Add Schedule Row</Button>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={closeGroupDialog}>Cancel</Button>
-              <Button onClick={submitGroup} variant="contained">
-                {groupDialog.mode === 'create' ? 'Create' : 'Save'}
-              </Button>
-            </DialogActions>
-          </Dialog>
+                    {errorGroups}
+                  </Alert>
+                ) : (
+                  <TableContainer>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 600, py: 3 }}>Group Code</TableCell>
+                          <TableCell sx={{ fontWeight: 600, py: 3 }}>Academic Level</TableCell>
+                          <TableCell sx={{ fontWeight: 600, py: 3 }}>Max Students</TableCell>
+                          <TableCell sx={{ fontWeight: 600, py: 3 }}>Schedule</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 600, py: 3 }}>Actions</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {groups.map((group) => (
+                          <TableRow 
+                            key={group._id} 
+                            hover
+                            sx={{ 
+                              '&:last-child td, &:last-child th': { border: 0 },
+                              transition: 'background-color 0.2s ease'
+                            }}
+                          >
+                            <TableCell>
+                              <Typography fontWeight={600} color="primary">
+                                {group.code}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Chip 
+                                label={group.academicLevel} 
+                                size="small" 
+                                variant="outlined"
+                                sx={{ 
+                                  fontWeight: 600,
+                                  borderWidth: 2
+                                }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Typography fontWeight={500}>
+                                {group.maxStudents}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Box sx={{ maxWidth: 200 }}>
+                                <Tooltip title={group.schedule.map(s => `${s.day} ${s.startTime}-${s.endTime}`).join(', ')}>
+                                  <Typography variant="body2" noWrap>
+                                    {group.schedule.map(s => 
+                                      `${s.day.slice(0, 3)} ${s.startTime}`
+                                    ).join(', ')}
+                                  </Typography>
+                                </Tooltip>
+                              </Box>
+                            </TableCell>
+                            <TableCell align="right">
+                              <Stack direction="row" spacing={1} justifyContent="flex-end">
+                                <Tooltip title="Edit group">
+                                  <IconButton 
+                                    size="small" 
+                                    onClick={() => openEditGroup(group)}
+                                    sx={{
+                                      color: professionalColors.primary,
+                                      backgroundColor: alpha(professionalColors.primary, 0.1),
+                                      '&:hover': {
+                                        backgroundColor: alpha(professionalColors.primary, 0.2),
+                                      }
+                                    }}
+                                  >
+                                    <EditIcon />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Delete group">
+                                  <IconButton 
+                                    size="small" 
+                                    onClick={() => openDeleteGroup(group._id, group.code)}
+                                    sx={{
+                                      color: professionalColors.error,
+                                      backgroundColor: alpha(professionalColors.error, 0.1),
+                                      '&:hover': {
+                                        backgroundColor: alpha(professionalColors.error, 0.2),
+                                      }
+                                    }}
+                                  >
+                                    <DeleteIcon />
+                                  </IconButton>
+                                </Tooltip>
+                              </Stack>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </CardContent>
+            </Card>
 
-          {/* Delete Group Dialog */}
-          <Dialog open={deleteDialog.open} onClose={closeDeleteDialog}>
-            <DialogTitle>Delete Group</DialogTitle>
-            <DialogContent>
-              <Typography>
-                Are you sure you want to delete group{' '}
-                <strong>{deleteDialog.code}</strong>?
-              </Typography>
-              {deleteDialog.error && (
-                <Alert severity="error">{deleteDialog.error}</Alert>
-              )}
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={closeDeleteDialog}>Cancel</Button>
-              <Button
-                onClick={submitDeleteGroup}
-                variant="contained"
-                color="error"
-              >
-                Delete
-              </Button>
-            </DialogActions>
-          </Dialog>
-        </Box>
-      )}
+            {/* Enhanced Create/Edit Group Dialog */}
+            <Dialog
+              open={groupDialog.open}
+              onClose={closeGroupDialog}
+              maxWidth="md"
+              fullWidth
+              PaperProps={{
+                sx: {
+                  borderRadius: 3,
+                  boxShadow: '0 20px 60px 0 rgba(0,0,0,0.15)'
+                }
+              }}
+            >
+              <DialogTitle sx={{ 
+                fontWeight: 600,
+                background: `linear-gradient(135deg, ${alpha(professionalColors.primary, 0.05)}, ${alpha(professionalColors.secondary, 0.05)})`,
+                borderBottom: `1px solid ${alpha(professionalColors.primary, 0.1)}`
+              }}>
+                {groupDialog.mode === 'create' ? 'Create New Group' : 'Edit Group'}
+              </DialogTitle>
+              <DialogContent sx={{ p: 4 }}>
+                <Stack spacing={4} sx={{ mt: 1 }}>
+                  {groupDialog.error && (
+                    <Alert 
+                      severity="error" 
+                      sx={{ borderRadius: 2 }}
+                    >
+                      {groupDialog.error}
+                    </Alert>
+                  )}
+                  
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        label="Group Code"
+                        value={groupDialog.data.code}
+                        onChange={(e) => handleGroupField('code', e.target.value)}
+                        fullWidth
+                        required
+                        helperText="Unique identifier for the group"
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: 2,
+                          }
+                        }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <TextField
+                        label="Academic Level"
+                        value={groupDialog.data.academicLevel}
+                        onChange={(e) => handleGroupField('academicLevel', e.target.value)}
+                        fullWidth
+                        required
+                        helperText="e.g., Grade 10, Undergraduate, etc."
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: 2,
+                          }
+                        }}
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <TextField
+                        label="Maximum Students"
+                        type="number"
+                        value={groupDialog.data.maxStudents}
+                        onChange={(e) => handleGroupField('maxStudents', e.target.value)}
+                        fullWidth
+                        required
+                        helperText="Maximum number of students in this group"
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            borderRadius: 2,
+                          }
+                        }}
+                      />
+                    </Grid>
+                  </Grid>
+
+                  <Box>
+                    <Typography variant="h6" gutterBottom fontWeight={600} sx={{ mb: 2 }}>
+                      Schedule Configuration
+                    </Typography>
+                    {groupDialog.data.schedule.map((row, idx) => (
+                      <Paper 
+                        key={idx} 
+                        variant="outlined" 
+                        sx={{ 
+                          p: 3, 
+                          mb: 2, 
+                          borderRadius: 2,
+                          border: `1px solid ${alpha(professionalColors.primary, 0.2)}`
+                        }}
+                      >
+                        <Grid container spacing={2} alignItems="center">
+                          <Grid item xs={12} md={4}>
+                            <TextField
+                              select
+                              label="Day of Week"
+                              value={row.day}
+                              onChange={(e) => handleScheduleChange(idx, 'day', e.target.value)}
+                              fullWidth
+                              size="medium"
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  borderRadius: 2,
+                                }
+                              }}
+                            >
+                              {[
+                                'monday',
+                                'tuesday',
+                                'wednesday',
+                                'thursday',
+                                'friday',
+                                'saturday',
+                                'sunday',
+                              ].map((d) => (
+                                <MenuItem key={d} value={d}>
+                                  {d.charAt(0).toUpperCase() + d.slice(1)}
+                                </MenuItem>
+                              ))}
+                            </TextField>
+                          </Grid>
+                          <Grid item xs={12} md={3}>
+                            <TextField
+                              label="Start Time"
+                              type="time"
+                              value={row.startTime}
+                              onChange={(e) => handleScheduleChange(idx, 'startTime', e.target.value)}
+                              InputLabelProps={{ shrink: true }}
+                              fullWidth
+                              size="medium"
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  borderRadius: 2,
+                                }
+                              }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={3}>
+                            <TextField
+                              label="End Time"
+                              type="time"
+                              value={row.endTime}
+                              onChange={(e) => handleScheduleChange(idx, 'endTime', e.target.value)}
+                              InputLabelProps={{ shrink: true }}
+                              fullWidth
+                              size="medium"
+                              sx={{
+                                '& .MuiOutlinedInput-root': {
+                                  borderRadius: 2,
+                                }
+                              }}
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={2}>
+                            <IconButton 
+                              onClick={() => removeScheduleRow(idx)}
+                              color="error"
+                              disabled={groupDialog.data.schedule.length === 1}
+                              sx={{
+                                backgroundColor: alpha(professionalColors.error, 0.1),
+                                '&:hover': {
+                                  backgroundColor: alpha(professionalColors.error, 0.2),
+                                }
+                              }}
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </Grid>
+                        </Grid>
+                      </Paper>
+                    ))}
+                    <Button 
+                      onClick={addScheduleRow} 
+                      startIcon={<AddIcon />}
+                      variant="outlined"
+                      sx={{ 
+                        borderRadius: 2,
+                        fontWeight: 600,
+                        borderWidth: 2,
+                        '&:hover': {
+                          borderWidth: 2
+                        }
+                      }}
+                    >
+                      Add Schedule Slot
+                    </Button>
+                  </Box>
+                </Stack>
+              </DialogContent>
+              <DialogActions sx={{ p: 4, pt: 0 }}>
+                <Button 
+                  onClick={closeGroupDialog}
+                  sx={{ 
+                    borderRadius: 2,
+                    fontWeight: 600,
+                    px: 4
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={submitGroup} 
+                  variant="contained"
+                  sx={{ 
+                    borderRadius: 2,
+                    fontWeight: 600,
+                    px: 4,
+                    background: `linear-gradient(135deg, ${professionalColors.primary}, ${professionalColors.secondary})`,
+                  }}
+                >
+                  {groupDialog.mode === 'create' ? 'Create Group' : 'Save Changes'}
+                </Button>
+              </DialogActions>
+            </Dialog>
+
+            {/* Enhanced Delete Group Dialog */}
+            <Dialog 
+              open={deleteDialog.open} 
+              onClose={closeDeleteDialog}
+              PaperProps={{
+                sx: {
+                  borderRadius: 3,
+                  boxShadow: '0 20px 60px 0 rgba(0,0,0,0.15)'
+                }
+              }}
+            >
+              <DialogTitle sx={{ fontWeight: 600 }}>
+                Confirm Deletion
+              </DialogTitle>
+              <DialogContent>
+                <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
+                  <Typography fontWeight={600}>
+                    This action cannot be undone.
+                  </Typography>
+                </Alert>
+                <Typography>
+                  Are you sure you want to delete group <strong>"{deleteDialog.code}"</strong>?
+                  This will permanently remove all associated data including attendance records.
+                </Typography>
+                {deleteDialog.error && (
+                  <Alert severity="error" sx={{ mt: 2, borderRadius: 2 }}>
+                    {deleteDialog.error}
+                  </Alert>
+                )}
+              </DialogContent>
+              <DialogActions sx={{ p: 3, pt: 0 }}>
+                <Button 
+                  onClick={closeDeleteDialog}
+                  sx={{ 
+                    borderRadius: 2,
+                    fontWeight: 600,
+                    px: 4
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={submitDeleteGroup}
+                  variant="contained"
+                  color="error"
+                  sx={{ 
+                    borderRadius: 2,
+                    fontWeight: 600,
+                    px: 4
+                  }}
+                >
+                  Delete Group
+                </Button>
+              </DialogActions>
+            </Dialog>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </Container>
   );
 }
