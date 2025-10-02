@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 const NotificationAPI = axios.create({
-  baseURL: process.env.REACT_APP_NOTIF_API_URL,
+  baseURL: "/api",
 });
 
 // (optionally) add logging or interceptors here
