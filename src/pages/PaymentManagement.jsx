@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+// src/pages/PaymentManagement.jsx
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Container,
   Typography,
@@ -46,11 +47,12 @@ import {
 
 export default function PaymentManagement() {
   const [activeTab, setActiveTab] = useState(0);
+
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
 
-  // Record Payment form state
+  // ----- Record Payment form state -----
   const [paymentForm, setPaymentForm] = useState({
     cardCode: '',
     month: currentMonth,
@@ -64,7 +66,7 @@ export default function PaymentManagement() {
     success: '',
   });
 
-  // Late Payments list state
+  // ----- Late Payments list state -----
   const [filter, setFilter] = useState({
     month: currentMonth === 1 ? 12 : currentMonth - 1,
     year: currentMonth === 1 ? currentYear - 1 : currentYear,
@@ -76,7 +78,7 @@ export default function PaymentManagement() {
     data: { students: [], isLatePeriod: false },
   });
 
-  // Reminder dialog state
+  // ----- Reminder dialog state -----
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [reminderDialog, setReminderDialog] = useState(false);
   const [reminderStatus, setReminderStatus] = useState({
@@ -85,28 +87,32 @@ export default function PaymentManagement() {
     success: '',
   });
 
-  // Summary tab state
+  // ----- Summary (from /payments/summary which returns an array) -----
   const [summaryFilter, setSummaryFilter] = useState({
     month: currentMonth,
     year: currentYear,
-    groupCode: '',
   });
   const [summary, setSummary] = useState({
     loading: false,
     error: '',
-    data: null, // { totals, byGroups, byMethods, byStudents } (أي subset)
+    data: [], // array like [{year, month, totalAmount, paymentCount, cashCount, ...}]
   });
 
+  // Load late payments when its filter changes
   useEffect(() => {
     fetchLatePayments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
+  // Load summary when switching to the Summary tab (index 2)
   useEffect(() => {
-    if (activeTab === 2) {
+    if (activeTab === 2 && summary.data.length === 0 && !summary.loading) {
       fetchPaymentsSummary();
     }
-  }, [activeTab, summaryFilter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
+  // -------- Handlers (forms) --------
   const handleFormChange = (e) => {
     const { name, value } = e.target;
     setPaymentForm((p) => ({ ...p, [name]: value }));
@@ -119,9 +125,10 @@ export default function PaymentManagement() {
 
   const handleSummaryFilterChange = (e) => {
     const { name, value } = e.target;
-    setSummaryFilter((f) => ({ ...f, [name]: value }));
+    setSummaryFilter((f) => ({ ...f, [name]: Number(value) }));
   };
 
+  // -------- API calls --------
   const handleRecordPayment = async (e) => {
     e.preventDefault();
     setRecordStatus({ loading: true, error: '', success: '' });
@@ -142,7 +149,7 @@ export default function PaymentManagement() {
     } catch (err) {
       setRecordStatus({
         loading: false,
-        error: err.response?.data?.message || 'Failed to record payment',
+        error: err?.response?.data?.message || 'Failed to record payment',
         success: '',
       });
     }
@@ -155,12 +162,15 @@ export default function PaymentManagement() {
       setLatePayments({
         loading: false,
         error: '',
-        data: res.data.data || { students: [], isLatePeriod: false },
+        data: res?.data?.data || {
+          students: [],
+          isLatePeriod: false,
+        },
       });
     } catch (err) {
       setLatePayments({
         loading: false,
-        error: err.response?.data?.message || 'Failed to load late payments',
+        error: err?.response?.data?.message || 'Failed to load late payments',
         data: { students: [], isLatePeriod: false },
       });
     }
@@ -169,17 +179,19 @@ export default function PaymentManagement() {
   const fetchPaymentsSummary = async () => {
     setSummary((s) => ({ ...s, loading: true, error: '' }));
     try {
-      const res = await getPaymentsSummary(summaryFilter);
+      const res = await getPaymentsSummary(); // no params
+      const array = res?.data?.data || [];
       setSummary({
         loading: false,
         error: '',
-        data: res.data?.data ?? null,
+        data: Array.isArray(array) ? array : [],
       });
     } catch (err) {
       setSummary({
         loading: false,
-        error: err.response?.data?.message || 'Failed to load payments summary',
-        data: null,
+        error:
+          err?.response?.data?.message || 'Failed to load payments summary',
+        data: [],
       });
     }
   };
@@ -206,11 +218,37 @@ export default function PaymentManagement() {
     } catch (err) {
       setReminderStatus({
         loading: false,
-        error: err.response?.data?.message || 'Failed to send reminder',
+        error: err?.response?.data?.message || 'Failed to send reminder',
         success: '',
       });
     }
   };
+
+  // -------- Derived summary data (client-side filter) --------
+  const yearsInData = useMemo(() => {
+    const ys = Array.from(new Set(summary.data.map((d) => d.year)));
+    return ys.sort((a, b) => b - a);
+  }, [summary.data]);
+
+  const monthsInData = useMemo(() => {
+    const filtered = summary.data.filter((d) => d.year === summaryFilter.year);
+    const ms = Array.from(new Set(filtered.map((d) => d.month)));
+    // If API empty for the chosen year, fall back to [1..12] for UI
+    return ms.length
+      ? ms.sort((a, b) => a - b)
+      : Array.from({ length: 12 }, (_, i) => i + 1);
+  }, [summary.data, summaryFilter.year]);
+
+  const currentSummary = useMemo(() => {
+    return (
+      summary.data.find(
+        (d) => d.year === summaryFilter.year && d.month === summaryFilter.month
+      ) || null
+    );
+  }, [summary.data, summaryFilter.year, summaryFilter.month]);
+
+  const summaryLoading = summary.loading;
+  const summaryError = summary.error;
 
   return (
     <Container sx={{ py: 4 }}>
@@ -230,6 +268,7 @@ export default function PaymentManagement() {
         </Tabs>
       </Paper>
 
+      {/* -------- Tab 0: Record Payment -------- */}
       {activeTab === 0 && (
         <Paper sx={{ p: 4, maxWidth: 800, mx: 'auto' }} elevation={3}>
           <Typography variant="h6" gutterBottom>
@@ -356,11 +395,12 @@ export default function PaymentManagement() {
         </Paper>
       )}
 
+      {/* -------- Tab 1: Late Payments -------- */}
       {activeTab === 1 && (
         <Paper sx={{ p: 3 }} elevation={3}>
           <Box display="flex" justifyContent="space-between" mb={3}>
             <Typography variant="h6">Late Payments</Typography>
-            <Box display="flex" gap={2} alignItems="center">
+            <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
               <TextField
                 select
                 size="small"
@@ -537,11 +577,34 @@ export default function PaymentManagement() {
         </Paper>
       )}
 
+      {/* -------- Tab 2: Summary (Total Amount, Cash Count, Year, Month only) -------- */}
       {activeTab === 2 && (
         <Paper sx={{ p: 3 }} elevation={3}>
-          <Box display="flex" justifyContent="space-between" mb={3}>
+          <Box
+            display="flex"
+            justifyContent="space-between"
+            mb={3}
+            flexWrap="wrap"
+            gap={2}
+          >
             <Typography variant="h6">Payments Summary</Typography>
             <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
+              <TextField
+                select
+                size="small"
+                label="Year"
+                name="year"
+                value={summaryFilter.year}
+                onChange={handleSummaryFilterChange}
+                sx={{ minWidth: 110 }}
+              >
+                {(yearsInData.length ? yearsInData : [currentYear]).map((y) => (
+                  <MenuItem key={y} value={y}>
+                    {y}
+                  </MenuItem>
+                ))}
+              </TextField>
+
               <TextField
                 select
                 size="small"
@@ -549,37 +612,17 @@ export default function PaymentManagement() {
                 name="month"
                 value={summaryFilter.month}
                 onChange={handleSummaryFilterChange}
-                sx={{ minWidth: 120 }}
+                sx={{ minWidth: 140 }}
               >
-                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                {monthsInData.map((m) => (
                   <MenuItem key={m} value={m}>
                     {new Date(2000, m - 1, 1).toLocaleString('default', {
-                      month: 'short',
-                    })}
+                      month: 'long',
+                    })}{' '}
+                    ({m})
                   </MenuItem>
                 ))}
               </TextField>
-
-              <TextField
-                size="small"
-                label="Year"
-                name="year"
-                type="number"
-                value={summaryFilter.year}
-                onChange={handleSummaryFilterChange}
-                sx={{ minWidth: 100 }}
-                inputProps={{ min: 2000, max: 2100 }}
-              />
-
-              <TextField
-                size="small"
-                label="Group Code"
-                name="groupCode"
-                value={summaryFilter.groupCode}
-                onChange={handleSummaryFilterChange}
-                sx={{ minWidth: 140 }}
-                placeholder="All Groups"
-              />
 
               <Button
                 variant="outlined"
@@ -591,163 +634,49 @@ export default function PaymentManagement() {
             </Box>
           </Box>
 
-          {summary.loading ? (
+          {summaryLoading ? (
             <Box display="flex" justifyContent="center" py={6}>
               <CircularProgress size={60} />
             </Box>
-          ) : summary.error ? (
-            <Alert severity="error">{summary.error}</Alert>
-          ) : !summary.data ? (
-            <Alert severity="info">
-              No summary available for the selected criteria.
-            </Alert>
+          ) : summaryError ? (
+            <Alert severity="error">{summaryError}</Alert>
+          ) : !currentSummary ? (
+            <Alert severity="info">No summary data available.</Alert>
           ) : (
             <Box>
-              <Grid container spacing={3} sx={{ mb: 3 }}>
-                {summary.data.totals?.expected != null && (
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Paper sx={{ p: 2 }}>
-                      <Typography variant="overline">Expected</Typography>
-                      <Typography variant="h5">
-                        {summary.data.totals.expected}
-                      </Typography>
-                    </Paper>
-                  </Grid>
-                )}
-                {summary.data.totals?.received != null && (
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Paper sx={{ p: 2 }}>
-                      <Typography variant="overline">Received</Typography>
-                      <Typography variant="h5">
-                        {summary.data.totals.received}
-                      </Typography>
-                    </Paper>
-                  </Grid>
-                )}
-                {summary.data.totals?.outstanding != null && (
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Paper sx={{ p: 2 }}>
-                      <Typography variant="overline">Outstanding</Typography>
-                      <Typography variant="h5">
-                        {summary.data.totals.outstanding}
-                      </Typography>
-                    </Paper>
-                  </Grid>
-                )}
-                {summary.data.totals?.onTime != null && (
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Paper sx={{ p: 2 }}>
-                      <Typography variant="overline">On-Time</Typography>
-                      <Typography variant="h5">
-                        {summary.data.totals.onTime}
-                      </Typography>
-                    </Paper>
-                  </Grid>
-                )}
+              <Grid container spacing={3}>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Paper sx={{ p: 2 }}>
+                    <Typography variant="overline">Total Amount</Typography>
+                    <Typography variant="h5">
+                      {currentSummary.totalAmount ?? 0}
+                    </Typography>
+                  </Paper>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <Paper sx={{ p: 2 }}>
+                    <Typography variant="overline">Cash Count</Typography>
+                    <Typography variant="h5">
+                      {currentSummary.cashCount ?? 0}
+                    </Typography>
+                  </Paper>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <Paper sx={{ p: 2 }}>
+                    <Typography variant="overline">Year</Typography>
+                    <Typography variant="h6">{currentSummary.year}</Typography>
+                  </Paper>
+                </Grid>
+
+                <Grid item xs={12} sm={6} md={3}>
+                  <Paper sx={{ p: 2 }}>
+                    <Typography variant="overline">Month</Typography>
+                    <Typography variant="h6">{currentSummary.month}</Typography>
+                  </Paper>
+                </Grid>
               </Grid>
-
-              {Array.isArray(summary.data.byGroups) &&
-                summary.data.byGroups.length > 0 && (
-                  <Box sx={{ mb: 3 }}>
-                    <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                      By Group
-                    </Typography>
-                    <TableContainer>
-                      <Table sx={{ width: '100%', tableLayout: 'fixed' }}>
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Group</TableCell>
-                            <TableCell align="right">Expected</TableCell>
-                            <TableCell align="right">Received</TableCell>
-                            <TableCell align="right">Outstanding</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {summary.data.byGroups.map((g) => (
-                            <TableRow key={g.groupCode}>
-                              <TableCell>{g.groupCode}</TableCell>
-                              <TableCell align="right">
-                                {g.expected ?? '—'}
-                              </TableCell>
-                              <TableCell align="right">
-                                {g.received ?? '—'}
-                              </TableCell>
-                              <TableCell align="right">
-                                {g.outstanding ?? '—'}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </Box>
-                )}
-
-              {Array.isArray(summary.data.byMethods) &&
-                summary.data.byMethods.length > 0 && (
-                  <Box sx={{ mb: 3 }}>
-                    <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                      By Method
-                    </Typography>
-                    <TableContainer>
-                      <Table sx={{ width: '100%', tableLayout: 'fixed' }}>
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Method</TableCell>
-                            <TableCell align="right">Amount</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {summary.data.byMethods.map((m) => (
-                            <TableRow key={m.method}>
-                              <TableCell>{m.method}</TableCell>
-                              <TableCell align="right">
-                                {m.amount ?? '—'}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </Box>
-                )}
-
-              {Array.isArray(summary.data.byStudents) &&
-                summary.data.byStudents.length > 0 && (
-                  <Box>
-                    <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                      By Student
-                    </Typography>
-                    <TableContainer>
-                      <Table sx={{ width: '100%', tableLayout: 'fixed' }}>
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Student</TableCell>
-                            <TableCell>Group</TableCell>
-                            <TableCell align="right">Paid</TableCell>
-                            <TableCell align="right">Outstanding</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {summary.data.byStudents.map((st) => (
-                            <TableRow
-                              key={st._id || `${st.name}-${st.groupCode}`}
-                            >
-                              <TableCell>{st.name}</TableCell>
-                              <TableCell>{st.groupCode ?? '—'}</TableCell>
-                              <TableCell align="right">
-                                {st.paid ?? '—'}
-                              </TableCell>
-                              <TableCell align="right">
-                                {st.outstanding ?? '—'}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </Box>
-                )}
             </Box>
           )}
         </Paper>

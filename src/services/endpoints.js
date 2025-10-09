@@ -36,8 +36,9 @@ export const getLatePaymentsByGroup = (groupCode) =>
     params: { groupCode },
   });
 // Payments summary (supports optional filters via params)
-export const getPaymentsSummary = (params) =>
-  API.get('/payments/summary', { params });
+// Payments summary (no params)
+export const getPaymentsSummary = () => API.get('/payments/summary');
+
 // My suspensions
 export const getMySuspensions = () => API.get('/assistants/my-suspensions');
 
