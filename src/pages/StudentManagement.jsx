@@ -52,6 +52,9 @@ import {
   School as SchoolIcon,
   Person as PersonIcon,
   Refresh as RefreshIcon,
+  Delete as DeleteIcon,
+  Send as SendIcon,
+  Edit as EditIcon,
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, isAfter } from 'date-fns';
@@ -63,6 +66,9 @@ import {
   suspendStudent,
   liftStudentSuspension,
   getAllGroups,
+  deleteStudent,
+  sendExamDegreesNotification,
+  updateStudent,
 } from '../services/endpoints';
 
 // Custom styled components
@@ -106,8 +112,8 @@ const StatusChip = ({ status }) => {
 };
 
 const StatsCard = ({ title, value, icon, color }) => (
-  <Card 
-    sx={{ 
+  <Card
+    sx={{
       background: `linear-gradient(135deg, ${color}20 0%, ${color}10 100%)`,
       border: `1px solid ${color}30`,
     }}
@@ -149,7 +155,9 @@ function AddTab({ onAdded }) {
       const res = await getAllGroups();
       setGroupsList(res.data.data);
     } catch (err) {
-      setErrorGroupsList(err.response?.data?.message || 'Failed to load groups');
+      setErrorGroupsList(
+        err.response?.data?.message || 'Failed to load groups'
+      );
     } finally {
       setLoadingGroupsList(false);
     }
@@ -193,18 +201,22 @@ function AddTab({ onAdded }) {
 
   return (
     <Box sx={{ maxWidth: 800, mx: 'auto' }}>
-      <Typography variant="h5" gutterBottom sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Typography
+        variant="h5"
+        gutterBottom
+        sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}
+      >
         <AddIcon color="primary" />
         Add New Student
       </Typography>
-      
+
       <StyledPaper>
         {error && (
           <Alert severity="error" sx={{ mb: 3 }}>
             {error}
           </Alert>
         )}
-        
+
         <Box component="form" onSubmit={handleSubmit}>
           <Grid container spacing={3}>
             <Grid item xs={12} sm={6}>
@@ -230,7 +242,7 @@ function AddTab({ onAdded }) {
                 placeholder="Student's phone number"
               />
             </Grid>
-            
+
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
@@ -242,7 +254,7 @@ function AddTab({ onAdded }) {
                 placeholder="Parent's WhatsApp number"
               />
             </Grid>
-            
+
             <Grid item xs={12} sm={6}>
               <FormControl fullWidth required error={!!errorGroupsList}>
                 <InputLabel>Group</InputLabel>
@@ -255,7 +267,9 @@ function AddTab({ onAdded }) {
                 >
                   {groupsList.map((g) => (
                     <MenuItem key={g._id} value={g.code}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box
+                        sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                      >
                         <GroupIcon fontSize="small" />
                         {g.code} - {g.academicLevel}
                       </Box>
@@ -267,21 +281,21 @@ function AddTab({ onAdded }) {
                 )}
               </FormControl>
             </Grid>
-            
+
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Academic Level"
                 name="academicLevel"
                 value={form.academicLevel}
-                InputProps={{ 
+                InputProps={{
                   readOnly: true,
-                  startAdornment: <SchoolIcon color="action" sx={{ mr: 1 }} />
+                  startAdornment: <SchoolIcon color="action" sx={{ mr: 1 }} />,
                 }}
                 placeholder="Auto-filled from group"
               />
             </Grid>
-            
+
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
@@ -293,21 +307,23 @@ function AddTab({ onAdded }) {
                 placeholder="Unique card identifier"
               />
             </Grid>
-            
+
             <Grid item xs={12}>
               <Divider sx={{ my: 2 }} />
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
                 <Button
                   type="reset"
                   variant="outlined"
-                  onClick={() => setForm({
-                    fullName: '',
-                    phoneNumber: '',
-                    parentWhatsAppNumber: '',
-                    academicLevel: '',
-                    groupCode: '',
-                    attendanceCardCode: '',
-                  })}
+                  onClick={() =>
+                    setForm({
+                      fullName: '',
+                      phoneNumber: '',
+                      parentWhatsAppNumber: '',
+                      academicLevel: '',
+                      groupCode: '',
+                      attendanceCardCode: '',
+                    })
+                  }
                 >
                   Clear
                 </Button>
@@ -316,7 +332,9 @@ function AddTab({ onAdded }) {
                   variant="contained"
                   size="large"
                   disabled={loading}
-                  startIcon={loading ? <CircularProgress size={20} /> : <AddIcon />}
+                  startIcon={
+                    loading ? <CircularProgress size={20} /> : <AddIcon />
+                  }
                 >
                   {loading ? 'Adding...' : 'Add Student'}
                 </Button>
@@ -338,7 +356,34 @@ function ListTab({ refreshToggle }) {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all');
+  // Update dialog
+  const [updateOpen, setUpdateOpen] = useState(false);
+  const [updateTarget, setUpdateTarget] = useState(null); // the selected student object
+  const [updateForm, setUpdateForm] = useState({
+    fullName: '',
+    phoneNumber: '',
+    parentWhatsAppNumber: '',
+    academicLevel: '',
+    groupCode: '',
+  });
+  const [groupsList, setGroupsList] = useState([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+  const [updateSaving, setUpdateSaving] = useState(false);
 
+  // Delete dialog
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Degrees dialog
+  const [degreeOpen, setDegreeOpen] = useState(false);
+  const [degreeTarget, setDegreeTarget] = useState(null);
+  const [degreeForm, setDegreeForm] = useState({
+    subjectName: '',
+    obtainedScore: '',
+    totalScore: '',
+  });
+  const [degreeSending, setDegreeSending] = useState(false);
   useEffect(() => {
     loadStudents();
   }, [refreshToggle]);
@@ -355,33 +400,158 @@ function ListTab({ refreshToggle }) {
       setLoading(false);
     }
   };
+  const loadGroups = async () => {
+    setGroupsLoading(true);
+    try {
+      const res = await getAllGroups();
+      setGroupsList(res.data.data || []);
+    } catch (err) {
+      // keep silent; dropdown will show empty
+    } finally {
+      setGroupsLoading(false);
+    }
+  };
 
+  // ---------- Update flow ----------
+  const openUpdate = async (student) => {
+    setUpdateTarget(student);
+    setUpdateForm({
+      fullName: student.fullName || '',
+      phoneNumber: student.phoneNumber || '',
+      parentWhatsAppNumber: student.parentWhatsAppNumber || '',
+      academicLevel: student.academicLevel || '',
+      groupCode: student.groupCode || '',
+    });
+    if (!groupsList.length) await loadGroups();
+    setUpdateOpen(true);
+  };
+
+  const onUpdateFormChange = (e) => {
+    const { name, value } = e.target;
+    if (name === 'groupCode') {
+      const grp = groupsList.find((g) => g.code === value);
+      setUpdateForm((f) => ({
+        ...f,
+        groupCode: value,
+        academicLevel: grp?.academicLevel || '',
+      }));
+    } else {
+      setUpdateForm((f) => ({ ...f, [name]: value }));
+    }
+  };
+
+  const submitUpdate = async () => {
+    if (!updateTarget?._id) return;
+    setUpdateSaving(true);
+    setError('');
+    try {
+      await updateStudent(updateTarget._id, updateForm);
+      // Update the local list optimistically
+      setStudents((list) =>
+        list.map((s) =>
+          s._id === updateTarget._id ? { ...s, ...updateForm } : s
+        )
+      );
+      setUpdateOpen(false);
+      setUpdateTarget(null);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update student');
+    } finally {
+      setUpdateSaving(false);
+    }
+  };
+
+  // ---------- Delete flow ----------
+  // ---------- Delete flow ----------
+  const openDelete = (student) => {
+    setDeleteTarget(student);
+    setDeleteOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget?._id) return;
+    setError('');
+    setDeleteLoading(true);
+    try {
+      await deleteStudent(deleteTarget._id);
+      setStudents((list) => list.filter((s) => s._id !== deleteTarget._id));
+      setDeleteOpen(false);
+      setDeleteTarget(null);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to delete student');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  // ---------- Degrees flow ----------
+  const openDegree = (student) => {
+    setDegreeTarget(student);
+    setDegreeForm({ subjectName: '', obtainedScore: '', totalScore: '' });
+    setDegreeOpen(true);
+  };
+
+  const submitDegree = async () => {
+    if (!degreeTarget) return;
+    const payload = {
+      examResults: [
+        {
+          studentName: degreeTarget.fullName,
+          parentNumber: (degreeTarget.parentWhatsAppNumber || '').trim(),
+          obtainedScore: String(degreeForm.obtainedScore || '').trim(),
+          totalScore: String(degreeForm.totalScore || '').trim(),
+          subjectName: String(degreeForm.subjectName || '').trim(),
+        },
+      ],
+    };
+    setDegreeSending(true);
+    setError('');
+    try {
+      await sendExamDegreesNotification(payload);
+      setDegreeOpen(false);
+      setDegreeTarget(null);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to send exam degrees');
+    } finally {
+      setDegreeSending(false);
+    }
+  };
   const filtered = students.filter((s) => {
-    const matchesSearch = 
+    const matchesSearch =
       s.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (s.groupCode || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (s.academicLevel || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (s.attendanceCardCode || '').toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesFilter = 
-      filter === 'all' ? true :
-      filter === 'active' ? s.isActive :
-      !s.isActive;
-    
+      (s.academicLevel || '')
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      (s.attendanceCardCode || '')
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase());
+
+    const matchesFilter =
+      filter === 'all' ? true : filter === 'active' ? s.isActive : !s.isActive;
+
     return matchesSearch && matchesFilter;
   });
 
-  const paginated = filtered.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const paginated = filtered.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
 
   const stats = {
     total: students.length,
-    active: students.filter(s => s.isActive).length,
-    suspended: students.filter(s => !s.isActive).length,
+    active: students.filter((s) => s.isActive).length,
+    suspended: students.filter((s) => !s.isActive).length,
   };
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="400px"
+      >
         <Box textAlign="center">
           <CircularProgress size={60} />
           <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
@@ -440,7 +610,7 @@ function ListTab({ refreshToggle }) {
             }}
             sx={{ minWidth: 300, flex: 1 }}
           />
-          
+
           <FormControl size="small" sx={{ minWidth: 120 }}>
             <InputLabel>Status</InputLabel>
             <Select
@@ -474,10 +644,24 @@ function ListTab({ refreshToggle }) {
           <Table>
             <TableHead>
               <TableRow sx={{ backgroundColor: 'primary.main' }}>
-                <TableCell sx={{ color: 'white', fontWeight: 600 }}>Student</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 600 }}>Academic Info</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 600 }}>Contact</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 600 }}>Status</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 600 }}>
+                  Student
+                </TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 600 }}>
+                  Academic Info
+                </TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 600 }}>
+                  Contact
+                </TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 600 }}>
+                  Status
+                </TableCell>
+                <TableCell
+                  sx={{ color: 'white', fontWeight: 600 }}
+                  align="center"
+                >
+                  Actions
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -493,10 +677,13 @@ function ListTab({ refreshToggle }) {
                     <TableCell>
                       <Box display="flex" alignItems="center">
                         <Badge
-                          color={student.isActive ? "success" : "error"}
+                          color={student.isActive ? 'success' : 'error'}
                           variant="dot"
                           overlap="circular"
-                          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                          anchorOrigin={{
+                            vertical: 'bottom',
+                            horizontal: 'right',
+                          }}
                         >
                           <Avatar
                             src={
@@ -509,7 +696,10 @@ function ListTab({ refreshToggle }) {
                             alt={student.fullName}
                             sx={{ width: 48, height: 48, mr: 2 }}
                           >
-                            {student.fullName.split(' ').map(n => n[0]).join('')}
+                            {student.fullName
+                              .split(' ')
+                              .map((n) => n[0])
+                              .join('')}
                           </Avatar>
                         </Badge>
                         <Box>
@@ -541,13 +731,21 @@ function ListTab({ refreshToggle }) {
                     <TableCell>
                       <Box display="flex" flexDirection="column" gap={1}>
                         <Box display="flex" alignItems="center">
-                          <PhoneIcon fontSize="small" color="action" sx={{ mr: 1 }} />
+                          <PhoneIcon
+                            fontSize="small"
+                            color="action"
+                            sx={{ mr: 1 }}
+                          />
                           <Typography variant="body2" fontFamily="monospace">
                             {student.phoneNumber}
                           </Typography>
                         </Box>
                         <Box display="flex" alignItems="center">
-                          <WhatsAppIcon fontSize="small" color="success" sx={{ mr: 1 }} />
+                          <WhatsAppIcon
+                            fontSize="small"
+                            color="success"
+                            sx={{ mr: 1 }}
+                          />
                           <Typography variant="body2" fontFamily="monospace">
                             {student.parentWhatsAppNumber}
                           </Typography>
@@ -555,15 +753,48 @@ function ListTab({ refreshToggle }) {
                       </Box>
                     </TableCell>
                     <TableCell>
-                      <StatusChip status={student.isActive ? 'active' : 'suspended'} />
+                      <StatusChip
+                        status={student.isActive ? 'active' : 'suspended'}
+                      />
+                    </TableCell>
+
+                    <TableCell align="center">
+                      <Box display="flex" gap={1} justifyContent="center">
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<EditIcon />}
+                          onClick={() => openUpdate(student)}
+                        >
+                          Update
+                        </Button>
+                        <Button
+                          size="small"
+                          color="error"
+                          variant="outlined"
+                          startIcon={<DeleteIcon />}
+                          onClick={() => openDelete(student)}
+                        >
+                          Delete
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          startIcon={<SendIcon />}
+                          onClick={() => openDegree(student)}
+                        >
+                          Degrees
+                        </Button>
+                      </Box>
                     </TableCell>
                   </motion.tr>
                 ))}
               </AnimatePresence>
-              
+
               {paginated.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                    {' '}
                     <Typography variant="body2" color="text.secondary">
                       No students found matching your criteria
                     </Typography>
@@ -588,6 +819,218 @@ function ListTab({ refreshToggle }) {
           sx={{ borderTop: 1, borderColor: 'divider' }}
         />
       </StyledPaper>
+      <Dialog
+        open={updateOpen}
+        onClose={() => setUpdateOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center" gap={1}>
+            <EditIcon color="primary" />
+            Update Student
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          {updateTarget && (
+            <Box component="form" display="grid" gap={2} sx={{ mt: 1 }}>
+              <TextField
+                label="Full Name"
+                name="fullName"
+                value={updateForm.fullName}
+                onChange={onUpdateFormChange}
+                fullWidth
+                required
+              />
+              <TextField
+                label="Phone Number"
+                name="phoneNumber"
+                value={updateForm.phoneNumber}
+                onChange={onUpdateFormChange}
+                fullWidth
+                required
+              />
+              <TextField
+                label="Parent WhatsApp Number"
+                name="parentWhatsAppNumber"
+                value={updateForm.parentWhatsAppNumber}
+                onChange={onUpdateFormChange}
+                fullWidth
+                required
+              />
+              <FormControl fullWidth required>
+                <InputLabel>Group</InputLabel>
+                <Select
+                  name="groupCode"
+                  label="Group"
+                  value={updateForm.groupCode}
+                  onChange={onUpdateFormChange}
+                  disabled={groupsLoading}
+                >
+                  {groupsList.map((g) => (
+                    <MenuItem key={g._id} value={g.code}>
+                      <Box
+                        sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                      >
+                        <GroupIcon fontSize="small" />
+                        {g.code} - {g.academicLevel}
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                label="Academic Level"
+                name="academicLevel"
+                value={updateForm.academicLevel}
+                InputProps={{
+                  readOnly: true,
+                  startAdornment: <SchoolIcon color="action" sx={{ mr: 1 }} />,
+                }}
+                fullWidth
+              />
+            </Box>
+          )}
+          {error && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {error}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setUpdateOpen(false)} variant="outlined">
+            Cancel
+          </Button>
+          <Button
+            onClick={submitUpdate}
+            variant="contained"
+            disabled={updateSaving}
+            startIcon={
+              updateSaving ? <CircularProgress size={16} /> : <EditIcon />
+            }
+          >
+            {updateSaving ? 'Saving...' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center" gap={1}>
+            <DeleteIcon color="error" />
+            Delete Student
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography>
+            Are you sure you want to delete{' '}
+            <strong>{deleteTarget?.fullName}</strong>?
+          </Typography>
+          {error && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {error}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteOpen(false)} variant="outlined">
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={confirmDelete}
+            disabled={deleteLoading}
+            startIcon={
+              deleteLoading ? <CircularProgress size={16} /> : <DeleteIcon />
+            }
+          >
+            {deleteLoading ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog
+        open={degreeOpen}
+        onClose={() => setDegreeOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center" gap={1}>
+            <SendIcon color="primary" />
+            Send Exam Degrees
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          {degreeTarget && (
+            <Box display="grid" gap={2}>
+              <Alert severity="info">
+                <strong>Student:</strong> {degreeTarget.fullName} &nbsp;•&nbsp;
+                <strong>Parent:</strong>{' '}
+                {degreeTarget.parentWhatsAppNumber || '—'}
+              </Alert>
+              <TextField
+                label="Subject Name"
+                value={degreeForm.subjectName}
+                onChange={(e) =>
+                  setDegreeForm((f) => ({ ...f, subjectName: e.target.value }))
+                }
+                fullWidth
+                required
+              />
+              <TextField
+                label="Obtained Score"
+                value={degreeForm.obtainedScore}
+                onChange={(e) =>
+                  setDegreeForm((f) => ({
+                    ...f,
+                    obtainedScore: e.target.value,
+                  }))
+                }
+                type="number"
+                inputProps={{ min: 0 }}
+                fullWidth
+                required
+              />
+              <TextField
+                label="Total Score"
+                value={degreeForm.totalScore}
+                onChange={(e) =>
+                  setDegreeForm((f) => ({ ...f, totalScore: e.target.value }))
+                }
+                type="number"
+                inputProps={{ min: 1 }}
+                fullWidth
+                required
+              />
+            </Box>
+          )}
+          {error && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {error}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDegreeOpen(false)} variant="outlined">
+            Cancel
+          </Button>
+          <Button
+            onClick={submitDegree}
+            variant="contained"
+            disabled={degreeSending}
+            startIcon={
+              degreeSending ? <CircularProgress size={16} /> : <SendIcon />
+            }
+          >
+            {degreeSending ? 'Sending...' : 'Send'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
@@ -602,53 +1045,51 @@ function SuspendTab({ refreshToggle }) {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [filter, setFilter] = useState('all');
   const [suspensionMap, setSuspensionMap] = useState({});
-useEffect(() => {
-  (async () => {
-    setLoading(true);
-    try {
-      const [allRes, suspRes] = await Promise.all([
-        getAllStudents(),
-        getMySuspensions(),
-      ]);
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const [allRes, suspRes] = await Promise.all([
+          getAllStudents(),
+          getMySuspensions(),
+        ]);
 
-      const allStudents = allRes.data.data;
-      const suspensions = suspRes.data.data;
+        const allStudents = allRes.data.data;
+        const suspensions = suspRes.data.data;
 
-      // هنحافظ على map للـ suspensions زي ما عندك
-      const m = {};
-      suspensions.forEach((s) => {
-        if (s.student?._id) {
-          m[s.student._id] = {
-            type: s.type,
-            notes: s.notes,
-            endDate: s.endDate ? s.endDate.slice(0, 10) : null,
-            suspensionId: s._id,
-          };
-        }
-      });
+        // هنحافظ على map للـ suspensions زي ما عندك
+        const m = {};
+        suspensions.forEach((s) => {
+          if (s.student?._id) {
+            m[s.student._id] = {
+              type: s.type,
+              notes: s.notes,
+              endDate: s.endDate ? s.endDate.slice(0, 10) : null,
+              suspensionId: s._id,
+            };
+          }
+        });
 
-      // نتاكد الطلبة بتوع الـ suspensions موجودين في students list
-      const suspStudents = suspensions
-        .map((s) => s.student)
-        .filter(Boolean);
+        // نتاكد الطلبة بتوع الـ suspensions موجودين في students list
+        const suspStudents = suspensions.map((s) => s.student).filter(Boolean);
 
-      // merge
-      const merged = [
-        ...allStudents,
-        ...suspStudents.filter(
-          (ss) => !allStudents.some((as) => as._id === ss._id)
-        ),
-      ];
+        // merge
+        const merged = [
+          ...allStudents,
+          ...suspStudents.filter(
+            (ss) => !allStudents.some((as) => as._id === ss._id)
+          ),
+        ];
 
-      setStudents(merged);
-      setSuspensionMap(m);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load students');
-    } finally {
-      setLoading(false);
-    }
-  })();
-}, [refreshToggle]);
+        setStudents(merged);
+        setSuspensionMap(m);
+      } catch (err) {
+        setError(err.response?.data?.message || 'Failed to load students');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [refreshToggle]);
 
   const loadData = async () => {
     setLoading(true);
@@ -657,9 +1098,9 @@ useEffect(() => {
         getAllStudents(),
         getMySuspensions(),
       ]);
-      
+
       setStudents(studentsRes.data.data);
-      
+
       const m = {};
       suspensionsRes.data.data.forEach((s) => {
         if (s.student?._id) {
@@ -720,7 +1161,11 @@ useEffect(() => {
       });
       setSuspensionMap((m) => ({
         ...m,
-        [studentId]: { ...entry, suspensionId: res.data.data._id, createdAt: new Date().toISOString() },
+        [studentId]: {
+          ...entry,
+          suspensionId: res.data.data._id,
+          createdAt: new Date().toISOString(),
+        },
       }));
       setStudents((list) =>
         list.map((s) => (s._id === studentId ? { ...s, isActive: false } : s))
@@ -756,7 +1201,12 @@ useEffect(() => {
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="400px"
+      >
         <Box textAlign="center">
           <CircularProgress size={60} />
           <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
@@ -771,7 +1221,13 @@ useEffect(() => {
     <Box>
       {/* Header */}
       <StyledPaper sx={{ mb: 3 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="center"
+          flexWrap="wrap"
+          gap={2}
+        >
           <Box>
             <Typography variant="h6" gutterBottom>
               Student Suspension Management
@@ -780,17 +1236,21 @@ useEffect(() => {
               Manage student suspensions and reinstatements
             </Typography>
           </Box>
-          
+
           <Box display="flex" gap={2} alignItems="center">
             <FormControl size="small" sx={{ minWidth: 120 }}>
               <InputLabel>Filter</InputLabel>
-              <Select value={filter} onChange={(e) => setFilter(e.target.value)} label="Filter">
+              <Select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                label="Filter"
+              >
                 <MenuItem value="all">All Students</MenuItem>
                 <MenuItem value="active">Active Only</MenuItem>
                 <MenuItem value="suspended">Suspended Only</MenuItem>
               </Select>
             </FormControl>
-            
+
             <Tooltip title="Refresh">
               <IconButton onClick={loadData}>
                 <RefreshIcon />
@@ -823,7 +1283,7 @@ useEffect(() => {
               {filtered.map((student) => {
                 const suspension = suspensionMap[student._id];
                 const isSuspended = !student.isActive;
-                
+
                 return (
                   <TableRow key={student._id} hover>
                     <TableCell>
@@ -838,7 +1298,10 @@ useEffect(() => {
                           }
                           sx={{ mr: 2 }}
                         >
-                          {student.fullName.split(' ').map(n => n[0]).join('')}
+                          {student.fullName
+                            .split(' ')
+                            .map((n) => n[0])
+                            .join('')}
                         </Avatar>
                         <Box>
                           <Typography variant="subtitle2" fontWeight="600">
@@ -853,11 +1316,23 @@ useEffect(() => {
                     <TableCell>
                       <Box display="flex" flexDirection="column" gap={0.5}>
                         <Chip label={student.academicLevel} size="small" />
-                        <Chip label={student.groupCode} size="small" variant="outlined" />
+                        <Chip
+                          label={student.groupCode}
+                          size="small"
+                          variant="outlined"
+                        />
                       </Box>
                     </TableCell>
                     <TableCell>
-                      <StatusChip status={isSuspended ? (suspension?.type === 'temporary' ? 'temporary' : 'suspended') : 'active'} />
+                      <StatusChip
+                        status={
+                          isSuspended
+                            ? suspension?.type === 'temporary'
+                              ? 'temporary'
+                              : 'suspended'
+                            : 'active'
+                        }
+                      />
                     </TableCell>
                     <TableCell>
                       {isSuspended ? (
@@ -865,11 +1340,16 @@ useEffect(() => {
                           <Typography variant="body2">
                             <strong>Type:</strong> {suspension?.type || '—'}
                           </Typography>
-                          {suspension?.type === 'temporary' && suspension?.endDate && (
-                            <Typography variant="body2">
-                              <strong>Until:</strong> {format(new Date(suspension.endDate), 'MMM dd, yyyy')}
-                            </Typography>
-                          )}
+                          {suspension?.type === 'temporary' &&
+                            suspension?.endDate && (
+                              <Typography variant="body2">
+                                <strong>Until:</strong>{' '}
+                                {format(
+                                  new Date(suspension.endDate),
+                                  'MMM dd, yyyy'
+                                )}
+                              </Typography>
+                            )}
                           {suspension?.notes && (
                             <Typography variant="body2" sx={{ mt: 0.5 }}>
                               <strong>Notes:</strong> {suspension.notes}
@@ -877,7 +1357,11 @@ useEffect(() => {
                           )}
                         </Box>
                       ) : (
-                        <Typography variant="body2" color="text.secondary" fontStyle="italic">
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          fontStyle="italic"
+                        >
                           No active suspension
                         </Typography>
                       )}
@@ -913,7 +1397,7 @@ useEffect(() => {
                   </TableRow>
                 );
               })}
-              
+
               {filtered.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
@@ -929,7 +1413,12 @@ useEffect(() => {
       </StyledPaper>
 
       {/* Suspension Dialog */}
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         {selectedStudent && (
           <>
             <DialogTitle sx={{ pb: 2 }}>
@@ -938,9 +1427,11 @@ useEffect(() => {
                 Suspend Student
               </Box>
             </DialogTitle>
-            
+
             <DialogContent>
-              <Box sx={{ mb: 3, p: 2, bgcolor: 'warning.light', borderRadius: 1 }}>
+              <Box
+                sx={{ mb: 3, p: 2, bgcolor: 'warning.light', borderRadius: 1 }}
+              >
                 <Typography variant="body2" fontWeight="600">
                   You are about to suspend: {selectedStudent.fullName}
                 </Typography>
@@ -1015,7 +1506,7 @@ useEffect(() => {
                 )}
               </Box>
             </DialogContent>
-            
+
             <DialogActions sx={{ p: 3, gap: 1 }}>
               <Button onClick={() => setDialogOpen(false)} variant="outlined">
                 Cancel
@@ -1025,9 +1516,17 @@ useEffect(() => {
                 color="warning"
                 onClick={() => handleSuspend(selectedStudent._id)}
                 disabled={actionLoading[selectedStudent._id]}
-                startIcon={actionLoading[selectedStudent._id] ? <CircularProgress size={16} /> : <BlockIcon />}
+                startIcon={
+                  actionLoading[selectedStudent._id] ? (
+                    <CircularProgress size={16} />
+                  ) : (
+                    <BlockIcon />
+                  )
+                }
               >
-                {actionLoading[selectedStudent._id] ? 'Suspending...' : 'Confirm Suspension'}
+                {actionLoading[selectedStudent._id]
+                  ? 'Suspending...'
+                  : 'Confirm Suspension'}
               </Button>
             </DialogActions>
           </>
@@ -1054,7 +1553,7 @@ export default function StudentManagement() {
   const tabIcons = [<AddIcon />, <PersonIcon />, <BlockIcon />];
 
   return (
-    <Container >
+    <Container>
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h3" fontWeight="700" gutterBottom>

@@ -35,7 +35,9 @@ export const getLatePaymentsByGroup = (groupCode) =>
   API.get('/payments/late', {
     params: { groupCode },
   });
-
+// Payments summary (supports optional filters via params)
+export const getPaymentsSummary = (params) =>
+  API.get('/payments/summary', { params });
 // My suspensions
 export const getMySuspensions = () => API.get('/assistants/my-suspensions');
 
@@ -82,6 +84,20 @@ export const getDailyGroupAttendance = ({ date, groupCode }) =>
   API.get('/attendance/daily-group', {
     params: { date, groupCode },
   });
+// Send exam degrees (WhatsApp-bot on its own server)
+// Send exam degrees (WhatsApp-bot on its own server)
+export const sendExamDegreesNotification = (data) =>
+  NotificationAPI.post('/notifications/exam-degrees', data);
+// Update a student by ID
+export const updateStudent = (id, data) => API.put(`/students/${id}`, data);
+
+// Mark a student as permanent by ID (no body)
+// Mark a student as permanent (no body)
+export const markStudentPermanent = (studentId) =>
+  API.put(`/students/${studentId}/permanent`);
+
+// Delete a student (true delete, no body)
+export const deleteStudent = (id) => API.delete(`/students/${id}`);
 
 // Create a new group
 export const createGroup = (data) => API.post('/groups', data);

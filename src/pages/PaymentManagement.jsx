@@ -31,7 +31,7 @@ import {
 import {
   AttachMoney,
   CreditCard,
-  Payment,
+  Payment as PaymentIcon,
   Refresh,
   Phone,
   WhatsApp,
@@ -41,6 +41,7 @@ import {
   recordPayment,
   getLatePayments,
   sendPaymentReminder,
+  getPaymentsSummary,
 } from '../services/endpoints';
 
 export default function PaymentManagement() {
@@ -84,9 +85,27 @@ export default function PaymentManagement() {
     success: '',
   });
 
+  // Summary tab state
+  const [summaryFilter, setSummaryFilter] = useState({
+    month: currentMonth,
+    year: currentYear,
+    groupCode: '',
+  });
+  const [summary, setSummary] = useState({
+    loading: false,
+    error: '',
+    data: null, // { totals, byGroups, byMethods, byStudents } (أي subset)
+  });
+
   useEffect(() => {
     fetchLatePayments();
   }, [filter]);
+
+  useEffect(() => {
+    if (activeTab === 2) {
+      fetchPaymentsSummary();
+    }
+  }, [activeTab, summaryFilter]);
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
@@ -96,6 +115,11 @@ export default function PaymentManagement() {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilter((f) => ({ ...f, [name]: value }));
+  };
+
+  const handleSummaryFilterChange = (e) => {
+    const { name, value } = e.target;
+    setSummaryFilter((f) => ({ ...f, [name]: value }));
   };
 
   const handleRecordPayment = async (e) => {
@@ -141,7 +165,24 @@ export default function PaymentManagement() {
       });
     }
   };
-        console.log(latePayments)
+
+  const fetchPaymentsSummary = async () => {
+    setSummary((s) => ({ ...s, loading: true, error: '' }));
+    try {
+      const res = await getPaymentsSummary(summaryFilter);
+      setSummary({
+        loading: false,
+        error: '',
+        data: res.data?.data ?? null,
+      });
+    } catch (err) {
+      setSummary({
+        loading: false,
+        error: err.response?.data?.message || 'Failed to load payments summary',
+        data: null,
+      });
+    }
+  };
 
   const handleSendReminder = async () => {
     setReminderStatus({ loading: true, error: '', success: '' });
@@ -184,7 +225,8 @@ export default function PaymentManagement() {
           variant="fullWidth"
         >
           <Tab label="Record Payment" icon={<AttachMoney />} />
-          <Tab label="Late Payments" icon={<Payment />} />
+          <Tab label="Late Payments" icon={<PaymentIcon />} />
+          <Tab label="Summary" icon={<CalendarMonth />} />
         </Tabs>
       </Paper>
 
@@ -382,7 +424,7 @@ export default function PaymentManagement() {
             </Alert>
           ) : (
             <TableContainer>
-              <Table>
+              <Table sx={{ width: '100%', tableLayout: 'fixed' }}>
                 <TableHead>
                   <TableRow>
                     <TableCell>Student</TableCell>
@@ -418,7 +460,10 @@ export default function PaymentManagement() {
                           <IconButton
                             href={
                               s.parentContact
-                                ? `https://wa.me/${s.parentContact.replace('+', '')}`
+                                ? `https://wa.me/${s.parentContact.replace(
+                                    '+',
+                                    ''
+                                  )}`
                                 : undefined
                             }
                             target="_blank"
@@ -430,9 +475,9 @@ export default function PaymentManagement() {
                         </Tooltip>
                       </TableCell>
                       <TableCell>
-                        <Chip 
-                          label={s.joinDate || 'N/A'} 
-                          size="small" 
+                        <Chip
+                          label={s.joinDate || 'N/A'}
+                          size="small"
                           variant="outlined"
                         />
                       </TableCell>
@@ -489,6 +534,222 @@ export default function PaymentManagement() {
               </Button>
             </DialogActions>
           </Dialog>
+        </Paper>
+      )}
+
+      {activeTab === 2 && (
+        <Paper sx={{ p: 3 }} elevation={3}>
+          <Box display="flex" justifyContent="space-between" mb={3}>
+            <Typography variant="h6">Payments Summary</Typography>
+            <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
+              <TextField
+                select
+                size="small"
+                label="Month"
+                name="month"
+                value={summaryFilter.month}
+                onChange={handleSummaryFilterChange}
+                sx={{ minWidth: 120 }}
+              >
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                  <MenuItem key={m} value={m}>
+                    {new Date(2000, m - 1, 1).toLocaleString('default', {
+                      month: 'short',
+                    })}
+                  </MenuItem>
+                ))}
+              </TextField>
+
+              <TextField
+                size="small"
+                label="Year"
+                name="year"
+                type="number"
+                value={summaryFilter.year}
+                onChange={handleSummaryFilterChange}
+                sx={{ minWidth: 100 }}
+                inputProps={{ min: 2000, max: 2100 }}
+              />
+
+              <TextField
+                size="small"
+                label="Group Code"
+                name="groupCode"
+                value={summaryFilter.groupCode}
+                onChange={handleSummaryFilterChange}
+                sx={{ minWidth: 140 }}
+                placeholder="All Groups"
+              />
+
+              <Button
+                variant="outlined"
+                startIcon={<Refresh />}
+                onClick={fetchPaymentsSummary}
+              >
+                Refresh
+              </Button>
+            </Box>
+          </Box>
+
+          {summary.loading ? (
+            <Box display="flex" justifyContent="center" py={6}>
+              <CircularProgress size={60} />
+            </Box>
+          ) : summary.error ? (
+            <Alert severity="error">{summary.error}</Alert>
+          ) : !summary.data ? (
+            <Alert severity="info">
+              No summary available for the selected criteria.
+            </Alert>
+          ) : (
+            <Box>
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                {summary.data.totals?.expected != null && (
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Paper sx={{ p: 2 }}>
+                      <Typography variant="overline">Expected</Typography>
+                      <Typography variant="h5">
+                        {summary.data.totals.expected}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                )}
+                {summary.data.totals?.received != null && (
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Paper sx={{ p: 2 }}>
+                      <Typography variant="overline">Received</Typography>
+                      <Typography variant="h5">
+                        {summary.data.totals.received}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                )}
+                {summary.data.totals?.outstanding != null && (
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Paper sx={{ p: 2 }}>
+                      <Typography variant="overline">Outstanding</Typography>
+                      <Typography variant="h5">
+                        {summary.data.totals.outstanding}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                )}
+                {summary.data.totals?.onTime != null && (
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Paper sx={{ p: 2 }}>
+                      <Typography variant="overline">On-Time</Typography>
+                      <Typography variant="h5">
+                        {summary.data.totals.onTime}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                )}
+              </Grid>
+
+              {Array.isArray(summary.data.byGroups) &&
+                summary.data.byGroups.length > 0 && (
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                      By Group
+                    </Typography>
+                    <TableContainer>
+                      <Table sx={{ width: '100%', tableLayout: 'fixed' }}>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Group</TableCell>
+                            <TableCell align="right">Expected</TableCell>
+                            <TableCell align="right">Received</TableCell>
+                            <TableCell align="right">Outstanding</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {summary.data.byGroups.map((g) => (
+                            <TableRow key={g.groupCode}>
+                              <TableCell>{g.groupCode}</TableCell>
+                              <TableCell align="right">
+                                {g.expected ?? '—'}
+                              </TableCell>
+                              <TableCell align="right">
+                                {g.received ?? '—'}
+                              </TableCell>
+                              <TableCell align="right">
+                                {g.outstanding ?? '—'}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                )}
+
+              {Array.isArray(summary.data.byMethods) &&
+                summary.data.byMethods.length > 0 && (
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                      By Method
+                    </Typography>
+                    <TableContainer>
+                      <Table sx={{ width: '100%', tableLayout: 'fixed' }}>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Method</TableCell>
+                            <TableCell align="right">Amount</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {summary.data.byMethods.map((m) => (
+                            <TableRow key={m.method}>
+                              <TableCell>{m.method}</TableCell>
+                              <TableCell align="right">
+                                {m.amount ?? '—'}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                )}
+
+              {Array.isArray(summary.data.byStudents) &&
+                summary.data.byStudents.length > 0 && (
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                      By Student
+                    </Typography>
+                    <TableContainer>
+                      <Table sx={{ width: '100%', tableLayout: 'fixed' }}>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Student</TableCell>
+                            <TableCell>Group</TableCell>
+                            <TableCell align="right">Paid</TableCell>
+                            <TableCell align="right">Outstanding</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {summary.data.byStudents.map((st) => (
+                            <TableRow
+                              key={st._id || `${st.name}-${st.groupCode}`}
+                            >
+                              <TableCell>{st.name}</TableCell>
+                              <TableCell>{st.groupCode ?? '—'}</TableCell>
+                              <TableCell align="right">
+                                {st.paid ?? '—'}
+                              </TableCell>
+                              <TableCell align="right">
+                                {st.outstanding ?? '—'}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                )}
+            </Box>
+          )}
         </Paper>
       )}
     </Container>
