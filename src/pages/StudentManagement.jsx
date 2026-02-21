@@ -37,12 +37,9 @@ import {
   CardContent,
   Divider,
   Badge,
-  useTheme,
-  alpha,
 } from '@mui/material';
 import {
   Search as SearchIcon,
-  FilterList as FilterIcon,
   Phone as PhoneIcon,
   WhatsApp as WhatsAppIcon,
   Block as BlockIcon,
@@ -90,7 +87,6 @@ const StyledPaper = ({ children, ...props }) => (
 );
 
 const StatusChip = ({ status }) => {
-  const theme = useTheme();
   const config = {
     active: { label: 'Active', color: 'success', icon: <CheckCircleIcon /> },
     suspended: { label: 'Suspended', color: 'error', icon: <BlockIcon /> },
