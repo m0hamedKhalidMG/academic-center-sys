@@ -7,7 +7,6 @@ import {
   Alert,
   InputAdornment,
   Box,
-  IconButton,
   Divider,
   Chip,
 } from '@mui/material';
@@ -38,6 +37,7 @@ export default function AssistantAuth() {
       }, 500); // Small delay to ensure all characters are captured
       return () => clearTimeout(timer);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scanComplete, cardId]);
 
   const handleLogin = async (e) => {
