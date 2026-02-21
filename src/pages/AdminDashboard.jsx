@@ -35,12 +35,10 @@ import {
   Chip,
   CardHeader,
   Divider,
-  InputAdornment,
   Tooltip,
   useTheme,
   useMediaQuery,
   alpha,
-  LinearProgress,
 } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -49,14 +47,9 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   People as PeopleIcon,
-  Schedule as ScheduleIcon,
   Group as GroupIcon,
-  QrCode as QrCodeIcon,
-  Search as SearchIcon,
   Visibility as VisibilityIcon,
   Security as SecurityIcon,
-  School as SchoolIcon,
-  Today as TodayIcon,
 } from '@mui/icons-material';
 
 import {
@@ -138,13 +131,13 @@ export default function AdminDashboard() {
     newPassword: '',
   });
 
-  const [filters, setFilters] = useState({
+  const [filters] = useState({
     date: new Date().toISOString().slice(0, 10),
     groupCode: '',
   });
-  const [attendance, setAttendance] = useState([]);
-  const [loadingAttendance, setLoadingAttendance] = useState(false);
-  const [errorAttendance, setErrorAttendance] = useState('');
+  const [, setAttendance] = useState([]);
+  const [, setLoadingAttendance] = useState(false);
+  const [, setErrorAttendance] = useState('');
 
   const [groups, setGroups] = useState([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
@@ -206,8 +199,6 @@ export default function AdminDashboard() {
   }, [filters]);
 
   // --- Helper functions (same as before) ---
-  const handleFilterChange = (e) =>
-    setFilters((f) => ({ ...f, [e.target.name]: e.target.value }));
 
   const submitCreate = async (e) => {
     e.preventDefault();
@@ -363,18 +354,8 @@ export default function AdminDashboard() {
   };
 
   // Enhanced status chip colors
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'present': return 'success';
-      case 'absent': return 'error';
-      case 'late': return 'warning';
-      default: return 'default';
-    }
-  };
 
   // Calculate statistics
-  const totalStudents = groups.reduce((sum, group) => sum + group.maxStudents, 0);
-  const todayAttendance = attendance.filter(a => a.status === 'present').length;
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
@@ -483,7 +464,7 @@ export default function AdminDashboard() {
                   description: 'Managed student groups'
                 },
                
-              ].map((stat, i) => (
+              ].map((stat) => (
                 <Grid key={stat.label} item xs={12} sm={6} lg={3}>
                   <motion.div variants={cardVariants}>
                     <Card 
