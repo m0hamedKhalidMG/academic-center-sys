@@ -1,4 +1,6 @@
 // src/components/AttendanceReport.jsx
+/* eslint-disable react-hooks/exhaustive-deps */
+// src/components/AttendanceReport.jsx
 import React, { useEffect, useState, useRef } from 'react';
 import {
   Container,
